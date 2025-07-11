@@ -1,61 +1,75 @@
 use std::{any::Any, collections::HashMap, sync::{Arc, Mutex, OnceLock, Weak}};
 
+// standard operations that bodu code can do
 pub mod op;
 
+// bodu values. those are often wrapped in Arc<Mutex<T>>s.
 #[derive(Clone, Debug)]
 pub enum Value {
-    Number(i64),
-    Float(f64),
-    Null,
-    String(String),
-    Boolean(bool),
-    Object(Object),
-    Tuple(Vec<Container>),
-    Bind(Container),
-    Function(Function),
+    Number(i64), // integers
+    Float(f64), // floats
+    Null, // null
+    String(String), // strings
+    Boolean(bool), // booleans
+    Object(Object), // objects
+    Tuple(Vec<Container>), // tuples
+    Bind(Container), // binds are like getter/setter properties, but they are variables and only have a getter.
+    Function(Function), // functions
 }
 
+// objects
 #[derive(Clone, Debug)]
 pub struct Object {
-    pub props: HashMap<String, ObjectProp>,
-    pub internals: HashMap<u64, Container>,
-    pub metaobj: Container,
-    pub externals: HashMap<u64, SharedAny>,
+    pub props: HashMap<String, ObjectProp>, // properties
+    pub internals: HashMap<u64, Container>, // internal values used by the object
+    pub metaobj: Container, // meta objects are objects that define how the object behaves (like for operator overloading)
+    pub externals: HashMap<u64, SharedAny>, // internal values that aren't bodu language values
 }
 
+// object properties
 #[derive(Clone, Debug)]
 pub enum ObjectProp {
-    Value(Container),
-    GetSet(Container, Container),
+    Value(Container), // value properties
+    GetSet(Container, Container), // getter/setter properties
 }
 
+// gets the function's internal values
 pub type Gi = Arc<dyn Fn(u64) -> Option<Container>>;
 
+// functions
 #[derive(Clone, Debug)]
 pub struct Function {
-    pub internals: HashMap<u64, Container>,
-    pub call: fn(StateContainer, Vec<Container>, Gi) -> Result<Container, Container>,
-    pub state: StateContainer,
+    pub internals: HashMap<u64, Container>, // internal values used by the function
+    pub call: fn(StateContainer, Vec<Container>, Gi) -> Result<Container, Container>, // the actual function
+    pub state: StateContainer, // the state it runs on
 }
 
+// Arc<Mutex<Value>>, used almost everywhere in the codebase
 pub type Container = Arc<Mutex<Value>>;
 
+// creates a new container
 pub fn make_container(v: Value) -> Container {
     let v = Container::new(Mutex::new(v));
+    // START don't touch this
     let mut cs = CONTAINERS.get().unwrap().lock().unwrap();
     cs.push(Arc::downgrade(&v));
+    // END don't touch this
     v
 }
 
+// the state: it contains the scope of a function and it is an execution context (kinda)
 #[derive(Debug)]
 pub struct State {
-    pub scope: Container,
-    pub parent: Option<StateContainer>,
-    pub global: Option<StateContainer>,
+    pub scope: Container, // the scope
+    pub parent: Option<StateContainer>, // parent state
+    pub global: Option<StateContainer>, // global state
 }
 
+// Container but for States
 pub type StateContainer = Arc<Mutex<State>>;
 
+// instructions for the VM
+// TODO: explain what these are
 #[derive(Clone)]
 pub enum Instruction {
     Add(VarIndex, VarIndex, VarIndex), // result, op1, op2
@@ -96,11 +110,15 @@ pub enum Label {
     Unnamed(u64),
 }
 
+// type for object externals
 pub type SharedAny = Arc<Mutex<Box<dyn Any + Send>>>;
 
+// makes an error, could be a macro
 pub fn make_err(v: &str) -> Container {
     make_container(Value::String(v.to_string()))
 }
+
+// DON'T TOUCH ANYTHING BELOW THIS LINE
 
 static CONTAINERS: OnceLock<Mutex<Vec<Weak<Mutex<Value>>>>> = OnceLock::new();
 static DEFERS: OnceLock<Mutex<Vec<Arc<dyn Fn() -> () + Sync + Send>>>> = OnceLock::new();

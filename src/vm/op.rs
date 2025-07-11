@@ -2,6 +2,8 @@ use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use crate::vm::{make_container, make_err, Container, Function, Instruction, Label, Object, ObjectProp, State, StateContainer, Value, VarIndex};
 
+// TODO: add comments
+
 pub fn resolve_bind(state: StateContainer, v: Container) -> Result<Container, Container> {
     let b = v.lock().unwrap().clone();
     match b {

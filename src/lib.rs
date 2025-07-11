@@ -1,3 +1,3 @@
-pub mod libstd;
-pub mod script;
-pub mod vm;
+pub mod libstd; // bodu standard library
+pub mod script; // bodu lexer and parser
+pub mod vm; // bodu VM
