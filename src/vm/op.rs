@@ -522,6 +522,11 @@ pub fn make_object() -> Container {
     make_container(Value::Object(make_object_base()))
 }
 
+pub fn call_prop(state: StateContainer, obj: Container, args: Vec<Container>, prop: String) -> Result<Container, Container> {
+    let f = get_base(state.clone(), obj, prop)?;
+    call(state.clone(), f, args)
+}
+
 pub fn make_function(state: StateContainer, instrs: Vec<Instruction>) -> Result<Container, Container> {
     let mut obj = make_object_base();
     obj.externals.insert(0, Arc::new(Mutex::new(Box::new(instrs.clone()))));

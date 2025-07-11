@@ -48,6 +48,7 @@ pub fn init_global_state(state: StateContainer) {
         make_function!(state, iter_object, "all", iter::all);
         make_function!(state, iter_object, "any", iter::any);
         make_function!(state, iter_object, "chain", iter::chain);
+        make_function!(state, iter_object, "cycle", iter::cycle);
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).unwrap();
     }
 }
