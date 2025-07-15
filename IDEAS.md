@@ -37,3 +37,5 @@ for a in iter until cond {
 # Stdlib
 
 - `os` lib: at least detect the OS
+- `range`: same as python
+- `iter.map`: array.prototype.map (from JS) but for iterators
