@@ -55,11 +55,11 @@ pub enum S1T {
     OpenBrack, // [
     CloseBrack, // ]
     Dot, // .
-    LineBreak, // \n
     Colon, // :
     Comma, // ,
     KeywordGoto, // goto
     KeywordFn, // fn
+    KeywordNull, // null
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -90,7 +90,7 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
                 }
                 continue;
             },
-            ch if ch == '\n' => res.push(S1T::LineBreak),
+            ch if ch.is_whitespace() => {},
             ';' => res.push(S1T::Semicolon),
             '=' => res.push(S1T::Equals),
             '0' => {
@@ -240,6 +240,7 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
                     "bind" => S1T::KeywordBind,
                     "goto" => S1T::KeywordGoto,
                     "fn" | "func" | "function" => S1T::KeywordFn,
+                    "null" => S1T::KeywordNull,
                     _ => S1T::Identifier(str)
                 });
             }

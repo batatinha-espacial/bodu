@@ -64,7 +64,6 @@ pub enum S2T {
     OpenBrack, // [
     CloseBrack, // ]
     Dot, // .
-    LineBreak, // \n
     Colon, // :
     Comma, // ,
     Goto, // goto
@@ -90,6 +89,7 @@ pub enum S2T {
     TupleFn, // [,]
     DecoratorFn, // [@]
     PipeFn, // [|>]
+    Null, // null
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -318,7 +318,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                     if let None = iterr.next_if(|t| {
                         match t {
                             S1T::Semicolon => true,
-                            S1T::LineBreak => true,
                             _ => false
                         }
                     }) {
@@ -326,20 +325,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                     }
                 }
                 res.push(S2T::Semicolon);
-            },
-            S1T::LineBreak => {
-                loop {
-                    if let None = iterr.next_if(|t| {
-                        match t {
-                            // S1T::Semicolon => true,
-                            S1T::LineBreak => true,
-                            _ => false
-                        }
-                    }) {
-                        break;
-                    }
-                }
-                res.push(S2T::LineBreak);
             },
             S1T::At => res.push(S2T::At),
             S1T::OpenParen => res.push(S2T::OpenParen),
@@ -351,6 +336,7 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::Comma => res.push(S2T::Comma),
             S1T::KeywordGoto => res.push(S2T::Goto),
             S1T::KeywordFn => res.push(S2T::Fn),
+            S1T::KeywordNull => res.push(S2T::Null),
         }
     }
     let s2 = res;
