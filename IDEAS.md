@@ -36,4 +36,4 @@ for a in iter until cond {
 
 # Stdlib
 
-None for now.
+- `os` lib: at least detect the OS
