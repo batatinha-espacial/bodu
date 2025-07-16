@@ -36,7 +36,14 @@ for a in iter until cond {
 
 # Stdlib
 
-- `os` lib: at least detect the OS
+- `os.name`: name of the OS
 - `range`: same as python
 - `iter.map`: array.prototype.map (from JS) but for iterators
 - `date`: time and date library
+- `math.abs`: absolute value
+- `bin`: integer to binary string
+- `chr`: converts an integer representing an unicode codepoint to a string
+- `iter.enumerate`: same as rust
+- `iter.filter`: same as rust
+- `hex`: integer to hexadecimal string
+- `id`: returns the id of a value (ids are memory addresses as strings)
