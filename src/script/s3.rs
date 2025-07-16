@@ -2,7 +2,7 @@ use crate::script::s2::S2T;
 
 // TODO: parse assign operators
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum S3T {
     Identifier(String),
     Let(String, Option<Box<S3T>>), // let: name, expr
@@ -55,19 +55,19 @@ pub enum S3T {
     OperatorFn(Operator), // wrap the operator in brackets
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ConditionType {
     If,
     Unless,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LoopType {
     While,
     Until,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Operator {
     Plus, // +
     Minus, // -

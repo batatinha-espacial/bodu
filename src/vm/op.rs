@@ -662,12 +662,16 @@ pub fn make_function(state: StateContainer, instrs: Vec<Instruction>) -> Result<
     let s = Arc::new(Mutex::new(State {
         scope: make_object(),
         parent: Some(state.clone()),
-        global: state.lock().unwrap().global.clone(),
-        globaldata: state.lock().unwrap().globaldata.clone(),
+        global: {
+            state.lock().unwrap().global.clone()
+        },
+        globaldata: {
+            state.lock().unwrap().globaldata.clone()
+        },
     }));
     Ok(make_container(Value::Function(Function {
         internals,
-        call: |state, args, gi: Arc<dyn Fn(u64) -> Option<Arc<Mutex<Value>>>>| {
+        call: |state, args, gi| {
             let instrs = gi(0).unwrap();
             let instrs = match instrs.lock().unwrap().clone() {
                 Value::Object(obj) => Some(obj),
@@ -781,15 +785,19 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
         i += 1;
     }
     let mut defers: Vec<Instruction> = Vec::new();
-    let mut i = 0;
+    i = 0;
     while i < instrs.len() {
         match instrs[i].clone() {
             Instruction::Return(vi) => {
-                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                if defers.len() > 0 {
+                    interpret_instructions(state.clone(), args, tmps, &defers)?;
+                }
                 return Ok((Some(get_var(state.clone(), args, tmps, vi.clone())?), None))
             },
             Instruction::Throw(vi) => {
-                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                if defers.len() > 0 {
+                    interpret_instructions(state.clone(), args, tmps, &defers)?;
+                }
                 return Err(get_var(state.clone(), args, tmps, vi.clone())?)
             },
             Instruction::Add(res, op1, op2) => {
@@ -857,7 +865,9 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 match opt {
                     Some(u) => i = *u,
                     None => {
-                        interpret_instructions(state.clone(), args, tmps, &defers)?;
+                        if defers.len() > 0 {
+                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                        }
                         return Ok((None, Some(l.clone())))
                     },
                 };
@@ -884,7 +894,9 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                     match opt {
                         Some(u) => i = *u,
                         None => {
-                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                            if defers.len() > 0 {
+                                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                            }
                             return Ok((None, Some(l.clone())))
                         },
                     };
@@ -900,7 +912,9 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 let r = interpret_instructions(s, args, tmps, &instvec)?;
                 match r {
                     (Some(v), l) => {
-                        interpret_instructions(state.clone(), args, tmps, &defers)?;
+                        if defers.len() > 0 {
+                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                        }
                         return Ok((Some(v), l))
                     },
                     (None, Some(l)) => {
@@ -911,7 +925,9 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                         match opt {
                             Some(u) => i = *u,
                             None => {
-                                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                if defers.len() > 0 {
+                                    interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                }
                                 return Ok((None, Some(l.clone())))
                             },
                         };
@@ -984,7 +1000,9 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                                 match opt {
                                     Some(u) => i = *u,
                                     None => {
-                                        interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                        if defers.len() > 0 {
+                                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                        }
                                         return Ok((None, Some(l.clone())))
                                     },
                                 };
@@ -1071,6 +1089,8 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
         }
         i += 1;
     }
-    interpret_instructions(state.clone(), args, tmps, &defers)?;
+    if defers.len() > 0 {
+        interpret_instructions(state.clone(), args, tmps, &defers)?;
+    }
     Ok((None, None))
 }

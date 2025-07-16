@@ -2,7 +2,7 @@ use std::{iter::Peekable, slice::Iter};
 
 use crate::script::s1::{Base, S1T};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum S2T {
     Identifier(String),
     Let, // let

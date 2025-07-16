@@ -1,6 +1,6 @@
 use std::{iter::{self, Peekable}, str::Chars};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Base {
     B10,
     B2,
@@ -8,7 +8,7 @@ pub enum Base {
     B16,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum S1T {
     Identifier(String),
     KeywordLet, // let
