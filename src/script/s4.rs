@@ -311,6 +311,7 @@ fn while_(type_: LoopType, cond: Box<S3T>, body: Vec<S3T>, res: &mut Vec<Instruc
     for i in body {
         stat(i, &mut vec_, tempi, labeli, outi, outli)?;
     }
+    res.push(Instruction::Block(vec_));
     res.push(Instruction::Goto(Label::Unnamed(condli)));
     res.push(Instruction::Label(Label::Unnamed(outli)));
     Ok(())
