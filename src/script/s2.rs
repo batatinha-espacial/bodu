@@ -30,7 +30,6 @@ pub enum S2T {
     Until, // until
     Defer, // defer
     Bind, // bind
-    FnShorthand, // $
     Plus, // +
     PlusAssign, // +=
     PlusPlus, // ++
@@ -138,7 +137,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordUntil => res.push(S2T::Until),
             S1T::KeywordDefer => res.push(S2T::Defer),
             S1T::KeywordBind => res.push(S2T::Bind),
-            S1T::Dollar => res.push(S2T::FnShorthand),
             S1T::Plus => {
                 if let Some(s) = iterr.next_if(|t| {
                     match t {

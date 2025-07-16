@@ -1,6 +1,6 @@
-use std::{collections::HashMap, sync::{Arc, Mutex, OnceLock, Weak}};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::vm::{make_container, op::{call, make_object, make_object_base, set_base, to_string, to_string_base}, push_defer, Container, Function, Gi, State, StateContainer, Value};
+use crate::vm::{make_container, op::{call, make_object, make_object_base, set_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
 
 // TODO: add comments
 
@@ -23,9 +23,16 @@ pub fn new_global_state() -> StateContainer {
         scope: make_object(),
         parent: None,
         global: None,
+        globaldata: None,
     }));
     let s2 = s.clone();
     s.lock().unwrap().global = Some(s2);
+    let gd = Arc::new(Mutex::new(GlobalData {
+        threads: Arc::new(Mutex::new(HashMap::new())),
+        threadid: 0,
+        threadsvec: Vec::new(),
+    }));
+    s.lock().unwrap().globaldata = Some(gd);
     s
 }
 
@@ -91,45 +98,6 @@ fn input(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container
     Ok(make_container(Value::String(i)))
 }
 
-static CONTAINERS: OnceLock<Mutex<Vec<Weak<Mutex<Value>>>>> = OnceLock::new();
-
-fn init_async() {
-    match CONTAINERS.set(Mutex::new(Vec::new())) {
-        Ok(_) => {
-            push_defer(Arc::new(|| {
-                let cs = CONTAINERS.get().unwrap().lock().unwrap();
-                let cs = cs.as_slice();
-                for p in cs {
-                    let p = match p.upgrade() {
-                        Some(p) => p,
-                        None => continue,
-                    };
-                    let p = match p.lock().unwrap().clone() {
-                        Value::Object(obj) => obj,
-                        _ => return,
-                    };
-                    let p = match p.externals.get(&0) {
-                        None => return,
-                        Some(a) => a,
-                    };
-                    let mut p = p.lock().unwrap();
-                    let p = p.downcast_mut::<HashMap<u64, tokio::task::JoinHandle<Result<Container, Container>>>>();
-                    let p = match p {
-                        Some(a) => a,
-                        None => return,
-                    };
-                    let p = match p.remove(&0) {
-                        Some(a) => a,
-                        None => return,
-                    };
-                    let _ = tokio::runtime::Runtime::new().unwrap().block_on(p.into_future());
-                }
-            }));
-        },
-        Err(_) => {},
-    }
-}
-
 fn async_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
         return Err(make_container(Value::String("async requires 1 argument".to_string())))
@@ -149,22 +117,23 @@ fn async_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Containe
                     call(state, f, args)
                 }
             };
+            let globaldata = &mut *state.lock().unwrap();
+            let globaldata = &mut *globaldata.globaldata.as_mut().unwrap().lock().unwrap();
+            let tid = globaldata.threadid;
+            globaldata.threadid += 1;
             let t = tokio::task::spawn(g());
-            let mut hm = HashMap::new();
-            hm.insert(0u64, t);
+            let threads = &mut *globaldata.threads.lock().unwrap();
+            threads.insert(tid, t);
             let mut obj = make_object_base();
-            obj.externals.insert(0, Arc::new(Mutex::new(Box::new(hm))));
-            init_async();
+            obj.externals.insert(0, Arc::new(Mutex::new(Box::new(tid))));
             let obj = make_container(Value::Object(obj));
-            let mut cs = CONTAINERS.get().unwrap().lock().unwrap();
-            cs.push(Arc::downgrade(&obj));
             Ok(obj)
         },
         state: state.clone(),
     })))
 }
 
-fn await_(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+fn await_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
         return Err(make_container(Value::String("await requires 1 argument".to_string())))
     }
@@ -178,14 +147,17 @@ fn await_(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, C
         Some(a) => a,
     };
     let mut p = p.lock().unwrap();
-    let p = p.downcast_mut::<HashMap<u64, tokio::task::JoinHandle<Result<Container, Container>>>>();
+    let p = p.downcast_mut::<u64>();
     let p = match p {
-        Some(a) => a,
+        Some(a) => *a,
         None => return Err(make_container(Value::String("await requires its argument to be a promise".to_string()))),
     };
-    let p = match p.remove(&0) {
-        Some(a) => a,
-        None => return Err(make_container(Value::String("await requires its argument to be a promise".to_string()))),
+    let p = {
+        let threads = &mut *state.lock().unwrap();
+        let threads = &mut *threads.globaldata.as_mut().unwrap().lock().unwrap();
+        threads.threadsvec = threads.threadsvec.clone().into_iter().filter(|i| *i != p).collect();
+        let threads = &mut *threads.threads.lock().unwrap();
+        threads.remove(&p).unwrap()
     };
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(p.into_future()).unwrap()

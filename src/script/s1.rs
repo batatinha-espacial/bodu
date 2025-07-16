@@ -34,7 +34,6 @@ pub enum S1T {
     KeywordUntil, // until
     KeywordDefer, // defer
     KeywordBind, // bind
-    Dollar, // $
     Plus, // +
     Minus, // -
     Times, // *
@@ -72,7 +71,7 @@ enum InsideComment {
 pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
     let mut iterr = contents.chars().peekable();
     let mut res: Vec<S1T> = Vec::new();
-    let invalid_idents = "{}$+-*/%?=!~<>&|^;@()[].:,\"\'";
+    let invalid_idents = "{}+-*/%?=!~<>&|^;@()[].:,\"\'";
     let mut inside_comment: InsideComment = InsideComment::No;
     while let Some(ch) = iterr.next() {
         match ch {
@@ -202,7 +201,6 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
             '[' => res.push(S1T::OpenBrack),
             ']' => res.push(S1T::CloseBrack),
             '@' => res.push(S1T::At),
-            '$' => res.push(S1T::Dollar),
             ',' => res.push(S1T::Comma),
             _ => {
                 let str = iter::once(ch)

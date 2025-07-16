@@ -527,6 +527,133 @@ pub fn call_prop(state: StateContainer, obj: Container, args: Vec<Container>, pr
     call(state.clone(), f, args)
 }
 
+pub fn not(state: StateContainer, v: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), v)?;
+    let v = x.clone().lock().unwrap().clone();
+    match v {
+        Value::Number(n) => Ok(make_container(Value::Number(!n))),
+        Value::Float(n) => Ok(make_container(Value::Number(!(n as i64)))),
+        Value::Boolean(b) => Ok(make_container(Value::Boolean(!b))),
+        Value::Object(obj) => call_metaprop(state.clone(), obj, vec![x], "not".to_string()),
+        _ => Err(make_err("can't not v")),
+    }
+}
+
+pub fn gt(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a > b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Boolean((a as f64) > b))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a > (b as f64)))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Boolean(a > b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "gt".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "gt".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
+pub fn ge(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a >= b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Boolean((a as f64) >= b))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a >= (b as f64)))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Boolean(a >= b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "ge".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "ge".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
+pub fn lt(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a < b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Boolean((a as f64) < b))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a < (b as f64)))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Boolean(a < b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "lt".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "lt".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
+pub fn le(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a <= b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Boolean((a as f64) <= b))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Boolean(a <= (b as f64)))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Boolean(a <= b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "le".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "le".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
+pub fn and(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Number(a & b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Number(a & (b as i64)))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Number((a as i64) & b))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Number((a as i64) & (b as i64)))),
+        (Value::Boolean(a), Value::Boolean(b)) => Ok(make_container(Value::Boolean(a & b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "and".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "and".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
+pub fn or(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Number(a | b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Number(a | (b as i64)))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Number((a as i64) | b))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Number((a as i64) | (b as i64)))),
+        (Value::Boolean(a), Value::Boolean(b)) => Ok(make_container(Value::Boolean(a | b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "or".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "or".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
+pub fn xor(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a)?;
+    let y = resolve_bind(state.clone(), b)?;
+    let a = x.lock().unwrap().clone();
+    let b = y.lock().unwrap().clone();
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => Ok(make_container(Value::Number(a ^ b))),
+        (Value::Number(a), Value::Float(b)) => Ok(make_container(Value::Number(a ^ (b as i64)))),
+        (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Number((a as i64) ^ b))),
+        (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Number((a as i64) ^ (b as i64)))),
+        (Value::Boolean(a), Value::Boolean(b)) => Ok(make_container(Value::Boolean(a ^ b))),
+        (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "xor".to_string()),
+        (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "xor".to_string()),
+        _ => Err(make_err("cannot compare a and b")),
+    }
+}
+
 pub fn make_function(state: StateContainer, instrs: Vec<Instruction>) -> Result<Container, Container> {
     let mut obj = make_object_base();
     obj.externals.insert(0, Arc::new(Mutex::new(Box::new(instrs.clone()))));
@@ -536,6 +663,7 @@ pub fn make_function(state: StateContainer, instrs: Vec<Instruction>) -> Result<
         scope: make_object(),
         parent: Some(state.clone()),
         global: state.lock().unwrap().global.clone(),
+        globaldata: state.lock().unwrap().globaldata.clone(),
     }));
     Ok(make_container(Value::Function(Function {
         internals,
@@ -642,8 +770,28 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
     let mut i = 0;
     while i < instrs.len() {
         match instrs[i].clone() {
-            Instruction::Return(vi) => return Ok((Some(get_var(state.clone(), args, tmps, vi.clone())?), None)),
-            Instruction::Throw(vi) => return Err(get_var(state.clone(), args, tmps, vi.clone())?),
+            Instruction::Label(l) => {
+                match l {
+                    Label::Unnamed(u) => ulabels.insert(u, i),
+                    Label::Named(s) => slabels.insert(s.clone(), i),
+                };
+            },
+            _ => {},
+        }
+        i += 1;
+    }
+    let mut defers: Vec<Instruction> = Vec::new();
+    let mut i = 0;
+    while i < instrs.len() {
+        match instrs[i].clone() {
+            Instruction::Return(vi) => {
+                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                return Ok((Some(get_var(state.clone(), args, tmps, vi.clone())?), None))
+            },
+            Instruction::Throw(vi) => {
+                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                return Err(get_var(state.clone(), args, tmps, vi.clone())?)
+            },
             Instruction::Add(res, op1, op2) => {
                 let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
                 let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
@@ -700,12 +848,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
             Instruction::Decl(op) => {
                 decl(state.clone(), op.clone())?;
             },
-            Instruction::Label(l) => {
-                match l {
-                    Label::Unnamed(u) => ulabels.insert(u, i),
-                    Label::Named(s) => slabels.insert(s.clone(), i),
-                };
-            },
+            Instruction::Label(_) => {},
             Instruction::Goto(l) => {
                 let opt = match l.clone() {
                     Label::Unnamed(u) => ulabels.get(&u),
@@ -713,7 +856,10 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 };
                 match opt {
                     Some(u) => i = *u,
-                    None => return Ok((None, Some(l.clone()))),
+                    None => {
+                        interpret_instructions(state.clone(), args, tmps, &defers)?;
+                        return Ok((None, Some(l.clone())))
+                    },
                 };
             },
             Instruction::Eql(res, op1, op2) => {
@@ -737,7 +883,10 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                     };
                     match opt {
                         Some(u) => i = *u,
-                        None => return Ok((None, Some(l.clone()))),
+                        None => {
+                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                            return Ok((None, Some(l.clone())))
+                        },
                     };
                 }
             },
@@ -746,10 +895,14 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                     scope: make_object(),
                     parent: Some(state.clone()),
                     global: state.lock().unwrap().global.clone(),
+                    globaldata: state.lock().unwrap().globaldata.clone(),
                 }));
                 let r = interpret_instructions(s, args, tmps, &instvec)?;
                 match r {
-                    (Some(v), l) => return Ok((Some(v), l)),
+                    (Some(v), l) => {
+                        interpret_instructions(state.clone(), args, tmps, &defers)?;
+                        return Ok((Some(v), l))
+                    },
                     (None, Some(l)) => {
                         let opt = match l.clone() {
                             Label::Unnamed(u) => ulabels.get(&u),
@@ -757,7 +910,10 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                         };
                         match opt {
                             Some(u) => i = *u,
-                            None => return Ok((None, Some(l.clone()))),
+                            None => {
+                                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                return Ok((None, Some(l.clone())))
+                            },
                         };
                     },
                     _ => {},
@@ -808,6 +964,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                     scope: make_object(),
                     parent: Some(state.clone()),
                     global: state.lock().unwrap().global.clone(),
+                    globaldata: state.lock().unwrap().globaldata.clone(),
                 }));
                 let r = interpret_instructions(s, args, tmps, &instvec);
                 match r {
@@ -826,7 +983,10 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                                 };
                                 match opt {
                                     Some(u) => i = *u,
-                                    None => return Ok((None, Some(l.clone()))),
+                                    None => {
+                                        interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                        return Ok((None, Some(l.clone())))
+                                    },
                                 };
                             },
                             _ => {},
@@ -834,8 +994,83 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                     },
                 }
             },
+            Instruction::Assign(r, op) => {
+                let op = get_var(state.clone(), args, tmps, op.clone())?;
+                set_var(state.clone(), tmps, r.clone(), op)?;
+            },
+            Instruction::Defer(v) => {
+                defers.extend(v.iter().map(|v| v.clone()));
+            },
+            Instruction::Boolean(res, op) => {
+                let op = make_container(Value::Boolean(op));
+                set_var(state.clone(), tmps, res.clone(), op)?;
+            },
+            Instruction::Number(res, op) => {
+                let op = make_container(Value::Number(op));
+                set_var(state.clone(), tmps, res.clone(), op)?;
+            },
+            Instruction::Float(res, op) => {
+                let op = make_container(Value::Float(op));
+                set_var(state.clone(), tmps, res.clone(), op)?;
+            },
+            Instruction::String(res, op) => {
+                let op = make_container(Value::String(op));
+                set_var(state.clone(), tmps, res.clone(), op)?;
+            },
+            Instruction::MakeFunction(res, body) => {
+                let f = make_function(state.clone(), body)?;
+                set_var(state.clone(), tmps, res, f)?;
+            },
+            Instruction::Not(res, op) => {
+                let op = get_var(state.clone(), args, tmps, op)?;
+                let r = not(state.clone(), op)?;
+                set_var(state.clone(), tmps, res, r)?;
+            },
+            Instruction::Gt(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = gt(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
+            Instruction::Ge(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = ge(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
+            Instruction::Lt(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = lt(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
+            Instruction::Le(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = le(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
+            Instruction::And(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = and(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
+            Instruction::Or(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = or(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
+            Instruction::Xor(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone())?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone())?;
+                let r = xor(state.clone(), op1.clone(), op2.clone())?;
+                set_var(state.clone(), tmps, res.clone(), r.clone())?;
+            },
         }
         i += 1;
     }
+    interpret_instructions(state.clone(), args, tmps, &defers)?;
     Ok((None, None))
 }

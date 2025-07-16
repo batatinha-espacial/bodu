@@ -22,7 +22,6 @@ pub enum S3T {
     Defer(Vec<S3T>), // defer: { ... }
     Bind(String, Box<S3T>), // bind: name, expr
     Function(Option<String>, Vec<String>, Vec<S3T>), // fn: name, ...args, { ... }
-    FnShortArg, // $
     Assign(Box<S3T>, Box<S3T>), // expr = expr
     Plus(Box<S3T>, Box<S3T>), // expr + expr
     Minus(Box<S3T>, Box<S3T>), // expr - expr
@@ -124,10 +123,6 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         Some(S2T::False) => {
             *i += 1;
             Some((S3T::Boolean(false), 1))
-        },
-        Some(S2T::FnShorthand) => {
-            *i += 1;
-            Some((S3T::FnShortArg, 1))
         },
         Some(S2T::PlusFn) => {
             *i += 1;

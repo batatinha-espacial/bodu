@@ -1,4 +1,6 @@
-use std::{any::Any, collections::HashMap, sync::{Arc, Mutex, OnceLock, Weak}};
+use std::{any::Any, collections::HashMap, sync::{Arc, Mutex}};
+
+use tokio::task::JoinHandle;
 
 // standard operations that bodu code can do
 pub mod op;
@@ -49,12 +51,7 @@ pub type Container = Arc<Mutex<Value>>;
 
 // creates a new container
 pub fn make_container(v: Value) -> Container {
-    let v = Container::new(Mutex::new(v));
-    // START don't touch this
-    let mut cs = CONTAINERS.get().unwrap().lock().unwrap();
-    cs.push(Arc::downgrade(&v));
-    // END don't touch this
-    v
+    Container::new(Mutex::new(v))
 }
 
 // the state: it contains the scope of a function and it is an execution context (kinda)
@@ -63,6 +60,14 @@ pub struct State {
     pub scope: Container, // the scope
     pub parent: Option<StateContainer>, // parent state
     pub global: Option<StateContainer>, // global state
+    pub globaldata: Option<Arc<Mutex<GlobalData>>>, // global data
+}
+
+#[derive(Debug)]
+pub struct GlobalData {
+    pub threads: Arc<Mutex<HashMap<u64, JoinHandle<Result<Container, Container>>>>>,
+    pub threadid: u64,
+    pub threadsvec: Vec<u64>,
 }
 
 // Container but for States
@@ -70,7 +75,7 @@ pub type StateContainer = Arc<Mutex<State>>;
 
 // instructions for the VM
 // TODO: explain what these are
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Instruction {
     Add(VarIndex, VarIndex, VarIndex), // result, op1, op2
     Return(VarIndex), // op
@@ -95,16 +100,31 @@ pub enum Instruction {
     Remainder(VarIndex, VarIndex, VarIndex), // result, op1, op2
     MakeBind(VarIndex, VarIndex), // result, f
     Catch(VarIndex, VarIndex, Vec<Instruction>), // err?, err, block
+    Assign(VarIndex, VarIndex), // result, op
+    Defer(Vec<Instruction>),
+    Boolean(VarIndex, bool), // result, op
+    Number(VarIndex, i64), // result, op
+    Float(VarIndex, f64), // result, op
+    String(VarIndex, String), // result, op
+    MakeFunction(VarIndex, Vec<Instruction>), // result, body
+    Not(VarIndex, VarIndex), // result, op
+    Gt(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    Ge(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    Lt(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    Le(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    And(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    Or(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    Xor(VarIndex, VarIndex, VarIndex), // result, op1, op2
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum VarIndex {
     Arg(usize),
     Ident(String),
     Temp(u64),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Label {
     Named(String),
     Unnamed(u64),
@@ -116,54 +136,4 @@ pub type SharedAny = Arc<Mutex<Box<dyn Any + Send>>>;
 // makes an error, could be a macro
 pub fn make_err(v: &str) -> Container {
     make_container(Value::String(v.to_string()))
-}
-
-// DON'T TOUCH ANYTHING BELOW THIS LINE
-
-static CONTAINERS: OnceLock<Mutex<Vec<Weak<Mutex<Value>>>>> = OnceLock::new();
-static DEFERS: OnceLock<Mutex<Vec<Arc<dyn Fn() -> () + Sync + Send>>>> = OnceLock::new();
-
-pub fn init() {
-    let _ = CONTAINERS.set(Mutex::new(Vec::new()));
-    let _ = DEFERS.set(Mutex::new(Vec::new()));
-}
-
-pub fn shutdown() {
-    let mut dfs = DEFERS.get().unwrap().lock().unwrap();
-    let dfs = dfs.as_mut_slice();
-    for i in dfs {
-        i();
-    }
-    let mut cs = CONTAINERS.get().unwrap().lock().unwrap();
-    let cs = cs.as_mut_slice();
-    for i in cs {
-        let mut i = match i.upgrade() {
-            Some(i) => i,
-            None => continue,
-        };
-        match Arc::get_mut(&mut i).unwrap().get_mut().unwrap() {
-            Value::Object(obj) => {
-                obj.props.clear();
-                obj.internals.clear();
-                obj.metaobj = Arc::new(Mutex::new(Value::Null));
-                obj.externals.clear();
-            },
-            Value::Tuple(t) => {
-                t.clear();
-            },
-            Value::Bind(b) => {
-                *b = Arc::new(Mutex::new(Value::Null));
-            },
-            Value::Function(f) => {
-                f.internals.clear();
-                f.state = Arc::new(Mutex::new(State { scope: Arc::new(Mutex::new(Value::Null)), parent: None, global: None }));
-            },
-            _ => {}
-        }
-    }
-}
-
-pub fn push_defer(df: Arc<dyn Fn() -> () + Sync + Send>) {
-    let mut dfs = DEFERS.get().unwrap().lock().unwrap();
-    dfs.push(df);
 }
