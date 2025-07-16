@@ -1,2 +1,5 @@
 # bodu
-Bodu, better modu.
+
+Bodu, better modu.<br>
+<br>
+Note for when this becomes public: I still haven't finished the README.
