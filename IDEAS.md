@@ -36,8 +36,6 @@ for a in iter until cond {
 
 # Stdlib
 
-- `os.name`: name of the OS
-- `range`: same as python
 - `iter.map`: array.prototype.map (from JS) but for iterators
 - `date`: time and date library
 - `math.abs`: absolute value
@@ -47,3 +45,5 @@ for a in iter until cond {
 - `iter.filter`: same as rust
 - `hex`: integer to hexadecimal string
 - `id`: returns the id of a value (ids are memory addresses as strings)
+- `oct`: integer to octal string
+- `ord`: converts a string to the unicode codepoint of its first character

@@ -1,11 +1,12 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::vm::{make_container, op::{call, make_object, make_object_base, set_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
+use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
 
 // TODO: add comments
 
 mod array;
 mod iter;
+mod os;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -38,26 +39,32 @@ pub fn new_global_state() -> StateContainer {
 
 pub fn init_global_state(state: StateContainer) {
     let scope = state.lock().unwrap().scope.clone();
-    make_function!(state, scope, "async", async_);
-    make_function!(state, scope, "await", await_);
-    make_function!(state, scope, "eprint", eprint);
-    make_function!(state, scope, "input", input);
-    make_function!(state, scope, "print", print);
-    make_function!(state, scope, "string", string);
     {
         let array_object = make_object();
         make_function!(state, array_object, "new", array::new);
         set_base(state.clone(), scope.clone(), "array".to_string(), array_object).unwrap();
     }
+    make_function!(state, scope, "async", async_);
+    make_function!(state, scope, "await", await_);
+    make_function!(state, scope, "eprint", eprint);
+    make_function!(state, scope, "input", input);
     {
         let iter_object = make_object();
-        make_function!(state, iter_object, "collect", iter::collect);
         make_function!(state, iter_object, "all", iter::all);
         make_function!(state, iter_object, "any", iter::any);
         make_function!(state, iter_object, "chain", iter::chain);
+        make_function!(state, iter_object, "collect", iter::collect);
         make_function!(state, iter_object, "cycle", iter::cycle);
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).unwrap();
     }
+    {
+        let os_object = make_object();
+        make_function!(state, os_object, "name", os::name);
+        set_base(state.clone(), scope.clone(), "os".to_string(), os_object).unwrap();
+    }
+    make_function!(state, scope, "print", print);
+    make_function!(state, scope, "range", range);
+    make_function!(state, scope, "string", string);
 }
 
 fn print(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -137,7 +144,7 @@ fn await_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Containe
     if args.len() == 0 {
         return Err(make_container(Value::String("await requires 1 argument".to_string())))
     }
-    let p = args[0].clone();
+    let p = resolve_bind(state.clone(), args[0].clone())?;
     let p = match p.lock().unwrap().clone() {
         Value::Object(obj) => obj,
         _ => return Err(make_container(Value::String("await requires its argument to be a promise".to_string()))),
@@ -169,4 +176,71 @@ fn string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Containe
     }
     let v = args[0].clone();
     to_string(state.clone(), v)
+}
+
+fn range(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("range requires from 1 to 3 arguments"))
+    }
+    let mut step: i64 = 1;
+    let mut start: i64 = 0;
+    let stop = if args.len() >= 2 {
+        args[1].clone()
+    } else {
+        args[0].clone()
+    };
+    let stop = to_number_base(state.clone(), stop)?;
+    if args.len() >= 2 {
+        start = to_number_base(state.clone(), args[0].clone())?;
+    }
+    if args.len() >= 3 {
+        step = to_number_base(state.clone(), args[2].clone())?;
+    }
+    let f = {
+        let mut internals = HashMap::new();
+        let mut obj = make_object_base();
+        obj.internals.insert(0, make_container(Value::Number(start)));
+        obj.internals.insert(1, make_container(Value::Number(stop)));
+        obj.internals.insert(2, make_container(Value::Number(step)));
+        internals.insert(0, make_container(Value::Object(obj)));
+        Function {
+            internals,
+            call: |_, _, gi| {
+                let obj = gi(0).unwrap().clone();
+                let obj = &mut *obj.lock().unwrap();
+                let obj = match obj {
+                    Value::Object(obj) => obj,
+                    _ => return Err(make_err("data corrupted")),
+                };
+                let start = match obj.internals.get(&0).unwrap().clone().lock().unwrap().clone() {
+                    Value::Number(n) => n,
+                    _ => return Err(make_err("data corrupted")),
+                };
+                let stop = match obj.internals.get(&1).unwrap().clone().lock().unwrap().clone() {
+                    Value::Number(n) => n,
+                    _ => return Err(make_err("data corrupted")),
+                };
+                let step = match obj.internals.get(&2).unwrap().clone().lock().unwrap().clone() {
+                    Value::Number(n) => n,
+                    _ => return Err(make_err("data corrupted")),
+                };
+                if step == 0 {
+                    return Err(make_err("a step of 0 was passed into range"))
+                }
+                let cond = if step > 0 {
+                    start < stop
+                } else {
+                    start > stop
+                };
+                if cond {
+                    obj.internals.insert(0, make_container(Value::Number(start+step)));
+                    Ok(make_tuple(vec![make_container(Value::Boolean(true)), make_container(Value::Number(start))]))
+                } else {
+                    Ok(make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]))
+                }
+            },
+            state: state.clone(),
+        }
+    };
+    Ok(make_container(Value::Function(f)))
 }
