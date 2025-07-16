@@ -359,24 +359,31 @@ fn fn_call(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                     Some(S2T::OpenParen) => {
                         *i += 1;
                         n += 1;
-                        match expr_list(input, i) {
-                            Some((vv, nn)) => {
-                                n += nn;
-                                match input.get(*i) {
-                                    Some(S2T::CloseParen) => {
-                                        *i += 1;
-                                        n += 1;
-                                        S3T::FnCall(Box::new(v), vv)
-                                    },
-                                    _ => {
-                                        *i -= n;
-                                        return None;
-                                    }
-                                }
+                        match input.get(*i) {
+                            Some(S2T::CloseParen) => {
+                                *i += 1;
+                                n += 1;
+                                S3T::FnCall(Box::new(v), vec![])
                             },
-                            _ => {
-                                *i -= n;
-                                return None;
+                            _ => match expr_list(input, i) {
+                                Some((vv, nn)) => {
+                                    n += nn;
+                                    match input.get(*i) {
+                                        Some(S2T::CloseParen) => {
+                                            *i += 1;
+                                            n += 1;
+                                            S3T::FnCall(Box::new(v), vv)
+                                        },
+                                        _ => {
+                                            *i -= n;
+                                            return None;
+                                        }
+                                    }
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
                             },
                         }
                     },

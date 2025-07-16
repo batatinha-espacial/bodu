@@ -40,6 +40,7 @@ pub fn add(state: StateContainer, a: Container, b: Container) -> Result<Containe
                         call(state.clone(), g, vec![r])
                     },
                     state: state.clone(),
+
                 }
             };
             Ok(make_container(Value::Function(h)))
@@ -85,6 +86,13 @@ pub fn to_string_base(state: StateContainer, v: Container) -> Result<String, Con
         Value::Object(obj) => {
             let tmp = call_metaprop(state.clone(), obj, vec![x], "to_string".to_string())?;
             to_string_base(state.clone(), tmp)
+        },
+        Value::Tuple(t) => {
+            let mut s = Vec::new();
+            for i in t.iter() {
+                s.push(to_string_base(state.clone(), i.clone())?);
+            }
+            Ok("(".to_string()+&s.join(", ")+")")
         },
         _ => Err(make_err("can't convert v to string")),
     }
@@ -654,21 +662,15 @@ pub fn xor(state: StateContainer, a: Container, b: Container) -> Result<Containe
     }
 }
 
-pub fn make_function(state: StateContainer, instrs: Vec<Instruction>) -> Result<Container, Container> {
+pub fn make_function(state: StateContainer, instrs: Vec<Instruction>, s: Option<StateContainer>) -> Result<Container, Container> {
     let mut obj = make_object_base();
     obj.externals.insert(0, Arc::new(Mutex::new(Box::new(instrs.clone()))));
     let mut internals = HashMap::new();
     internals.insert(0, make_container(Value::Object(obj)));
-    let s = Arc::new(Mutex::new(State {
-        scope: make_object(),
-        parent: Some(state.clone()),
-        global: {
-            state.lock().unwrap().global.clone()
-        },
-        globaldata: {
-            state.lock().unwrap().globaldata.clone()
-        },
-    }));
+    let s = match s {
+        Some(s) => s.clone(),
+        None => new_state(state.clone()),
+    };
     Ok(make_container(Value::Function(Function {
         internals,
         call: |state, args, gi| {
@@ -688,6 +690,22 @@ pub fn make_function(state: StateContainer, instrs: Vec<Instruction>) -> Result<
         },
         state: s,
     })))
+}
+
+pub fn new_state(state: StateContainer) -> StateContainer {
+    Arc::new(Mutex::new(State {
+        scope: make_object(),
+        parent: Some(state.clone()),
+        global: {
+            state.lock().unwrap().global.clone()
+        },
+        globaldata: {
+            state.lock().unwrap().globaldata.clone()
+        },
+        debug: {
+            state.lock().unwrap().debug
+        },
+    }))
 }
 
 pub fn get_from_state(ident: String, state: StateContainer) -> Result<Container, Container> {
@@ -903,12 +921,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 }
             },
             Instruction::Block(instvec) => {
-                let s = Arc::new(Mutex::new(State {
-                    scope: make_object(),
-                    parent: Some(state.clone()),
-                    global: state.lock().unwrap().global.clone(),
-                    globaldata: state.lock().unwrap().globaldata.clone(),
-                }));
+                let s = new_state(state.clone());
                 let r = interpret_instructions(s, args, tmps, &instvec)?;
                 match r {
                     (Some(v), l) => {
@@ -976,12 +989,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 set_var(state.clone(), tmps, res, r)?;
             },
             Instruction::Catch(erri, err, instvec) => {
-                let s = Arc::new(Mutex::new(State {
-                    scope: make_object(),
-                    parent: Some(state.clone()),
-                    global: state.lock().unwrap().global.clone(),
-                    globaldata: state.lock().unwrap().globaldata.clone(),
-                }));
+                let s = new_state(state.clone());
                 let r = interpret_instructions(s, args, tmps, &instvec);
                 match r {
                     Err(e) => {
@@ -1036,7 +1044,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 set_var(state.clone(), tmps, res.clone(), op)?;
             },
             Instruction::MakeFunction(res, body) => {
-                let f = make_function(state.clone(), body)?;
+                let f = make_function(state.clone(), body, None)?;
                 set_var(state.clone(), tmps, res, f)?;
             },
             Instruction::Not(res, op) => {

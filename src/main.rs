@@ -1,34 +1,33 @@
-use bodu::{libstd::{init_global_state, new_global_state}, script::{s1::s1, s2::s2, s3::s3, s4::s4}, vm::op::{call, make_function}};
-
-static HELP_MSG: &str = r#"Commands:
-run <file> - Run a Bodu file
-repl       - Start the Bodu REPL
-help       - Show this help message
-version    - Show the version of Bodu installed
---version  - Alias of `version`"#;
+use bodu::{libstd::{init_global_state, new_global_state}, script::{s1::s1, s2::s2, s3::s3, s4::s4}, vm::op::{call, make_function, new_state, to_string_base}};
+use clap::{Arg, Command};
+use rustyline::DefaultEditor;
 
 fn main() {
-    let args = std::env::args().collect::<Vec<String>>();
-
-    if args.len() < 2 {
-        println!("{}", HELP_MSG);
-        return;
-    }
-
-    let action = &args[1];
-
-    match action.as_str() {
-        "run" => {
-            if args.len() < 3 {
-                println!("{}", HELP_MSG);
-                return;
-            }
-            interpret(args[2].clone());
-        },
-        "repl" => todo!("implement repl"),
-        "help" => println!("{}", HELP_MSG),
-        "version" | "--version" => println!("Bodu 0.1.0"),
-        _ => println!("Invalid action. Run `bodu help` for available commands"),
+    let mut cmd = Command::new("bodu")
+        .subcommand(
+            Command::new("run")
+                .arg(
+                    Arg::new("file")
+                        .required(true)
+                ).about("run a bodu file")
+        ).subcommand(
+            Command::new("repl")
+            .about("start the bodu repl")
+        ).subcommand(
+            Command::new("version")
+                .visible_alias("--version")
+                .about("print version and exit")
+        ).subcommand_required(true);
+    let matches = cmd.clone().get_matches();
+    if let Some(_) = matches.subcommand_matches("version") {
+        println!("Bodu 0.1.0");
+    } else if let Some(_) = matches.subcommand_matches("repl") {
+        repl();
+    } else if let Some(matches) = matches.subcommand_matches("run") {
+        let file = matches.get_one::<String>("file").unwrap();
+        interpret(file.clone());
+    } else {
+        cmd.print_help().unwrap();
     }
 }
 
@@ -40,6 +39,73 @@ fn interpret(file: String) {
     let instrs = s4(contents).unwrap();
     let state = new_global_state();
     init_global_state(state.clone());
-    let f = make_function(state.clone(), instrs).unwrap();
+    let f = make_function(state.clone(), instrs, None).unwrap();
     call(state.clone(), f, vec![]).unwrap();
+}
+
+fn repl() {
+    println!("Welcome to the Bodu REPL!");
+    let state = new_global_state();
+    init_global_state(state.clone());
+    let s = new_state(state.clone());
+    let mut rl = DefaultEditor::new().unwrap();
+    loop {
+        let line = rl.readline(">> ");
+        match line {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str()).unwrap();
+                let line = match s1(line) {
+                    Ok(s) => s,
+                    Err(s) => {
+                        println!("Error while parsing (S1): {}", s);
+                        continue;
+                    },
+                };
+                let line = match s2(line) {
+                    Ok(s) => s,
+                    Err(s) => {
+                        println!("Error while parsing (S2): {}", s);
+                        continue;
+                    },
+                };
+                let line = match s3(line) {
+                    Ok(s) => s,
+                    Err(s) => {
+                        println!("Error while parsing (S3): {}", s);
+                        continue;
+                    },
+                };
+                let line = match s4(line) {
+                    Ok(s) => s,
+                    Err(s) => {
+                        println!("Error while parsing (S4): {}", s);
+                        continue;
+                    },
+                };
+                let f = match make_function(state.clone(), line, Some(s.clone())) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        let e = to_string_base(state.clone(), e).unwrap();
+                        println!("Error while compiling into function: {}", e);
+                        continue;
+                    },
+                };
+                match call(state.clone(), f, vec![]) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        let e = match to_string_base(state.clone(), e) {
+                            Ok(e) => e,
+                            Err(_) => {
+                                println!("Error while converting error to string.");
+                                continue;
+                            },
+                        };
+                        println!("Runtime error: {}", e);
+                        continue;
+                    },
+                }
+            },
+            _ => break,
+        }
+    }
 }

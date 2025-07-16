@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, io::Write, sync::{Arc, Mutex}};
 
 use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
 
@@ -25,6 +25,7 @@ pub fn new_global_state() -> StateContainer {
         parent: None,
         global: None,
         globaldata: None,
+        debug: false,
     }));
     let s2 = s.clone();
     s.lock().unwrap().global = Some(s2);
@@ -32,6 +33,8 @@ pub fn new_global_state() -> StateContainer {
         threads: Arc::new(Mutex::new(HashMap::new())),
         threadid: 0,
         threadsvec: Vec::new(),
+        exitcode: 0,
+        runtime: Arc::new(Mutex::new(tokio::runtime::Runtime::new().unwrap())),
     }));
     s.lock().unwrap().globaldata = Some(gd);
     s
@@ -100,6 +103,7 @@ fn input(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container
     let args = args2;
     let str = args.join("\t");
     print!("{}", str);
+    std::io::stdout().flush().unwrap();
     let mut i = String::new();
     std::io::stdin().read_line(&mut i).unwrap();
     Ok(make_container(Value::String(i)))
@@ -128,7 +132,8 @@ fn async_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Containe
             let globaldata = &mut *globaldata.globaldata.as_mut().unwrap().lock().unwrap();
             let tid = globaldata.threadid;
             globaldata.threadid += 1;
-            let t = tokio::task::spawn(g());
+            let runtime = &mut * globaldata.runtime.lock().unwrap();
+            let t = runtime.spawn(g());
             let threads = &mut *globaldata.threads.lock().unwrap();
             threads.insert(tid, t);
             let mut obj = make_object_base();
@@ -166,8 +171,12 @@ fn await_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Containe
         let threads = &mut *threads.threads.lock().unwrap();
         threads.remove(&p).unwrap()
     };
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(p.into_future()).unwrap()
+    {
+        let rt = &mut *state.lock().unwrap();
+        let rt = &mut *rt.globaldata.as_mut().unwrap().lock().unwrap();
+        let rt = &mut *rt.runtime.lock().unwrap();
+        rt.block_on(p.into_future()).unwrap()
+    }
 }
 
 fn string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {

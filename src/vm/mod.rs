@@ -1,6 +1,6 @@
 use std::{any::Any, collections::HashMap, sync::{Arc, Mutex}};
 
-use tokio::task::JoinHandle;
+use tokio::{runtime::Runtime, task::JoinHandle};
 
 // standard operations that bodu code can do
 pub mod op;
@@ -61,6 +61,7 @@ pub struct State {
     pub parent: Option<StateContainer>, // parent state
     pub global: Option<StateContainer>, // global state
     pub globaldata: Option<Arc<Mutex<GlobalData>>>, // global data
+    pub debug: bool, // whether debug mode is active
 }
 
 #[derive(Debug)]
@@ -68,6 +69,8 @@ pub struct GlobalData {
     pub threads: Arc<Mutex<HashMap<u64, JoinHandle<Result<Container, Container>>>>>,
     pub threadid: u64,
     pub threadsvec: Vec<u64>,
+    pub exitcode: u8,
+    pub runtime: Arc<Mutex<Runtime>>,
 }
 
 // Container but for States
