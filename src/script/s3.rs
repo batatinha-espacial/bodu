@@ -1,7 +1,5 @@
 use crate::script::s2::S2T;
 
-// TODO: parse assign operators
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum S3T {
     Identifier(String),
@@ -42,17 +40,15 @@ pub enum S3T {
     Xor(Box<S3T>, Box<S3T>), // expr ^ expr
     Property(Box<S3T>, Box<S3T>), // expr[prop], expr.prop
     Tuple(Vec<S3T>), // expr1, expr2, expr3, ...
-    // TODO
     Detuple(Vec<S3T>, Box<S3T>), // (var1, var2, var3, ...) = expr
-    // TODO
     LetDetuple(Vec<String>, Box<S3T>), // let (v1, v2, v3, ...) = expr
     FnCall(Box<S3T>, Vec<S3T>), // expr(arg1, arg2, arg3, ...)
     Decorator(Box<S3T>, Box<S3T>), // @expr
     Pipe(Box<S3T>, Box<S3T>), // expr |> f
-    // TODO
     Goto(String), // goto #name
     OrThat(Box<S3T>, Box<S3T>), // expr ?? expr
     OperatorFn(Operator), // wrap the operator in brackets
+    MultiLet(Vec<String>), // let (v1, v2, v3, ...)
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -851,6 +847,16 @@ fn expr(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
     t
 }
 
+#[derive(Clone, Copy)]
+enum AssignOp {
+    Assign,
+    Plus,
+    Minus,
+    Times,
+    Divide,
+    Modulus,
+}
+
 fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
     let t = match stat_expr(input, i) {
         Some(t) => Some(t),
@@ -871,6 +877,143 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                         *i -= n;
                         return None;
                     },
+                }
+            },
+            _ => None,
+        },
+    };
+    let t = match t {
+        Some(t) => Some(t),
+        _ => match input.get(*i) {
+            Some(S2T::OpenParen) => {
+                let mut n = 1;
+                *i += 1;
+                match expr_list(input, i) {
+                    Some((v, nn)) => {
+                        n += nn;
+                        match input.get(*i) {
+                            Some(S2T::CloseParen) => {
+                                *i += 1;
+                                n += 1;
+                                match input.get(*i) {
+                                    Some(S2T::Assign) => {
+                                        *i += 1;
+                                        n += 1;
+                                        match expr(input, i) {
+                                            Some((r, nn)) => {
+                                                n += nn;
+                                                match input.get(*i) {
+                                                    Some(S2T::Semicolon) => {
+                                                        *i += 1;
+                                                        n += 1;
+                                                        Some((S3T::Detuple(v, Box::new(r)), n))
+                                                    },
+                                                    _ => {
+                                                        *i -= n;
+                                                        None
+                                                    },
+                                                }
+                                            },
+                                            _ => {
+                                                *i -= n;
+                                                None
+                                            },
+                                        }
+                                    },
+                                    _ => {
+                                        *i -= n;
+                                        None
+                                    },
+                                }
+                            },
+                            _ => {
+                                *i -= n;
+                                None
+                            },
+                        }
+                    },
+                    _ => {
+                        *i -= n;
+                        None
+                    },
+                }
+            },
+            _ => None,
+        },
+    };
+    let t = match t {
+        Some(t) => Some(t),
+        _ => match expr(input, i) {
+            Some((left, nn)) => {
+                let mut n = nn;
+                let op = match input.get(*i) {
+                    Some(S2T::Assign) => Some(AssignOp::Assign),
+                    Some(S2T::PlusAssign) => Some(AssignOp::Plus),
+                    Some(S2T::MinusAssign) => Some(AssignOp::Minus),
+                    Some(S2T::TimesAssign) => Some(AssignOp::Times),
+                    Some(S2T::DivideAssign) => Some(AssignOp::Divide),
+                    Some(S2T::ModulusAssign) => Some(AssignOp::Modulus),
+                    _ => None,
+                };
+                if let Some(op) = op {
+                    *i += 1;
+                    n += 1;
+                    match expr(input, i) {
+                        Some((right, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::Semicolon) => {
+                                    *i += 1;
+                                    n += 1;
+                                    match op {
+                                        AssignOp::Assign => Some((S3T::Assign(Box::new(left), Box::new(right)), n)),
+                                        AssignOp::Plus => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Plus(Box::new(left.clone()), Box::new(right)))), n)),
+                                        AssignOp::Minus => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Minus(Box::new(left.clone()), Box::new(right)))), n)),
+                                        AssignOp::Times => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Times(Box::new(left.clone()), Box::new(right)))), n)),
+                                        AssignOp::Divide => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Divide(Box::new(left.clone()), Box::new(right)))), n)),
+                                        AssignOp::Modulus => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Modulus(Box::new(left.clone()), Box::new(right)))), n)),
+                                    }
+                                },
+                                _ => {
+                                    *i -= n;
+                                    None
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            None
+                        },
+                    }
+                } else {
+                    match input.get(*i) {
+                        Some(S2T::PlusPlus) => {
+                            *i += 1;
+                            n += 1;
+                            match input.get(*i) {
+                                Some(S2T::Semicolon) => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Plus(Box::new(left.clone()), Box::new(S3T::Number(1))))), n)),
+                                _ => {
+                                    *i -= n;
+                                    None
+                                },
+                            }
+                        },
+                        Some(S2T::MinusMinus) => {
+                            *i += 1;
+                            n += 1;
+                            match input.get(*i) {
+                                Some(S2T::Semicolon) => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Minus(Box::new(left.clone()), Box::new(S3T::Number(1))))), n)),
+                                _ => {
+                                    *i -= n;
+                                    None
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            None
+                        },
+                    }
                 }
             },
             _ => None,
@@ -902,7 +1045,17 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                 let t = match t {
                                     Some(t) => Some(t),
                                     _ => match expr(input, i) {
-                                        Some((v, nn)) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n)),
+                                        Some((v, nn)) => {
+                                            *i += 1;
+                                            match input.get(*i) {
+                                                Some(S2T::Semicolon) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n + 1)),
+                                                _ => {
+                                                    *i -= nn;
+                                                    *i -= 1;
+                                                    None
+                                                },
+                                            }
+                                        },
                                         _ => None,
                                     },
                                 };
@@ -912,6 +1065,76 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                 *i -= n;
                                 None
                             }
+                        }
+                    },
+                    Some(S2T::OpenParen) => {
+                        n += 1;
+                        *i += 1;
+                        match ident_list(input, i) {
+                            Some((ident, nn)) => {
+                                n += nn;
+                                match input.get(*i) {
+                                    Some(S2T::CloseParen) => {
+                                        *i += 1;
+                                        n += 1;
+                                        match input.get(*i) {
+                                            Some(S2T::Assign) => {
+                                                *i += 1;
+                                                n += 1;
+                                                let t = match stat_expr(input, i) {
+                                                    Some((v, nn)) => {
+                                                        *i += 1;
+                                                        match input.get(*i) {
+                                                            Some(S2T::Semicolon) => Some((S3T::LetDetuple(ident.clone(), Box::new(v)), nn + n + 1)),
+                                                            _ => {
+                                                                *i -= nn;
+                                                                *i -= 1;
+                                                                None
+                                                            },
+                                                        }
+                                                    },
+                                                    _ => None,
+                                                };
+                                                let t = match t {
+                                                    Some(t) => Some(t),
+                                                    _ => match expr(input, i) {
+                                                        Some((v, nn)) => {
+                                                            *i += 1;
+                                                            match input.get(*i) {
+                                                                Some(S2T::Semicolon) => Some((S3T::LetDetuple(ident.clone(), Box::new(v)), nn + n + 1)),
+                                                                _ => {
+                                                                    *i -= nn;
+                                                                    *i -= 1;
+                                                                    None
+                                                                },
+                                                            }
+                                                        },
+                                                        _ => None,
+                                                    },
+                                                };
+                                                t
+                                            },
+                                            Some(S2T::Semicolon) => {
+                                                *i += 1;
+                                                n += 1;
+                                                Some((S3T::MultiLet(ident), n))
+                                            },
+                                            _ => {
+                                                *i -= n;
+                                                None
+                                            },
+                                        }
+                                    },
+                                    _ => {
+                                        *i -= n;
+                                        None
+                                    },
+                                }
+                            },
+                            _ => {
+                                *i -= n;
+                                None
+                            },
                         }
                     },
                     _ => {
@@ -1319,6 +1542,37 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                     },
                 };
                 Some((S3T::Decorator(Box::new(d), Box::new(f)), n))
+            },
+            _ => None,
+        },
+    };
+    let t = match t {
+        Some(t) => Some(t),
+        _ => match input.get(*i) {
+            Some(S2T::Goto) => {
+                let mut n = 1;
+                *i += 1;
+                match input.get(*i) {
+                    Some(S2T::Label(s)) => {
+                        *i += 1;
+                        n += 1;
+                        match input.get(*i) {
+                            Some(S2T::Semicolon) => {
+                                *i += 1;
+                                n += 1;
+                                Some((S3T::Goto(s.clone()), n))
+                            },
+                            _ => {
+                                *i -= n;
+                                None
+                            },
+                        }
+                    },
+                    _ => {
+                        *i -= n;
+                        None
+                    },
+                }
             },
             _ => None,
         },
