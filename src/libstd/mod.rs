@@ -11,6 +11,7 @@ mod iter;
 mod os;
 mod buffer;
 mod json;
+mod event;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -65,6 +66,11 @@ pub fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "chr", chr);
     make_function!(state, scope, "eprint", eprint);
+    {
+        let event_obj = make_object();
+        make_function!(state, event_obj, "new", event::new);
+        set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).unwrap();
+    }
     make_function!(state, scope, "input", input);
     {
         let iter_object = make_object();
