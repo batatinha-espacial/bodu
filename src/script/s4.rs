@@ -1,6 +1,6 @@
 use crate::{script::s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, VarIndex}};
 
-// TODO: Decorator, Pipe, OrThat, OperatorFn
+// TODO: Decorator, Pipe, OrThat, OperatorFn, MultiLet, Null, PipeShorthand
 
 pub fn s4(input: Vec<S3T>) -> Result<Vec<Instruction>, String> {
     let mut tempi: u64 = 1; // outi = 0
@@ -596,3 +596,4 @@ fn fn_call(v: Box<S3T>, args: Vec<S3T>, res: &mut Vec<Instruction>, tempi: &mut 
     res.push(Instruction::Call(VarIndex::Temp(vi), v, args));
     Ok(VarIndex::Temp(vi))
 }
+

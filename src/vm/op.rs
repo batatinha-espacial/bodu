@@ -682,7 +682,7 @@ pub fn make_function(state: StateContainer, instrs: Vec<Instruction>, s: Option<
             let instrs = instrs.unwrap().externals;
             let instrs = instrs[&0].lock().unwrap().downcast_ref::<Vec<Instruction>>().unwrap().clone();
             let mut tmps: HashMap<u64, Container> = HashMap::new();
-            let r = interpret_instructions(state, &args, &mut tmps, &instrs)?;
+            let r = interpret_instructions(state, &args, &mut tmps, &instrs, None)?;
             match r {
                 (Some(r), _) => Ok(r),
                 (None, _) => Ok(make_container(Value::Null)),
@@ -786,7 +786,7 @@ pub fn detuple(state: StateContainer, v: Container) -> Result<Vec<Container>, Co
     }
 }
 
-pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps: &mut HashMap<u64, Container>, instrs: &Vec<Instruction>) -> Result<(Option<Container>, Option<Label>), Container> {
+pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps: &mut HashMap<u64, Container>, instrs: &Vec<Instruction>, pipeshort: Option<Container>) -> Result<(Option<Container>, Option<Label>), Container> {
     let mut ulabels: HashMap<u64, usize> = HashMap::new();
     let mut slabels: HashMap<String, usize> = HashMap::new();
     let mut i = 0;
@@ -803,18 +803,22 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
         i += 1;
     }
     let mut defers: Vec<Instruction> = Vec::new();
+    let mut pipeshort = match pipeshort {
+        Some(v) => v.clone(),
+        None => make_container(Value::Null),
+    };
     i = 0;
     while i < instrs.len() {
         match instrs[i].clone() {
             Instruction::Return(vi) => {
                 if defers.len() > 0 {
-                    interpret_instructions(state.clone(), args, tmps, &defers)?;
+                    interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                 }
                 return Ok((Some(get_var(state.clone(), args, tmps, vi.clone())?), None))
             },
             Instruction::Throw(vi) => {
                 if defers.len() > 0 {
-                    interpret_instructions(state.clone(), args, tmps, &defers)?;
+                    interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                 }
                 return Err(get_var(state.clone(), args, tmps, vi.clone())?)
             },
@@ -884,7 +888,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                     Some(u) => i = *u,
                     None => {
                         if defers.len() > 0 {
-                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                            interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                         }
                         return Ok((None, Some(l.clone())))
                     },
@@ -913,7 +917,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                         Some(u) => i = *u,
                         None => {
                             if defers.len() > 0 {
-                                interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                             }
                             return Ok((None, Some(l.clone())))
                         },
@@ -922,11 +926,11 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
             },
             Instruction::Block(instvec) => {
                 let s = new_state(state.clone());
-                let r = interpret_instructions(s, args, tmps, &instvec)?;
+                let r = interpret_instructions(s, args, tmps, &instvec, Some(pipeshort.clone()))?;
                 match r {
                     (Some(v), l) => {
                         if defers.len() > 0 {
-                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                            interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                         }
                         return Ok((Some(v), l))
                     },
@@ -939,7 +943,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                             Some(u) => i = *u,
                             None => {
                                 if defers.len() > 0 {
-                                    interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                    interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                                 }
                                 return Ok((None, Some(l.clone())))
                             },
@@ -990,7 +994,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
             },
             Instruction::Catch(erri, err, instvec) => {
                 let s = new_state(state.clone());
-                let r = interpret_instructions(s, args, tmps, &instvec);
+                let r = interpret_instructions(s, args, tmps, &instvec, Some(pipeshort.clone()));
                 match r {
                     Err(e) => {
                         set_var(state.clone(), tmps, erri, make_container(Value::Boolean(true)))?;
@@ -1009,7 +1013,7 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                                     Some(u) => i = *u,
                                     None => {
                                         if defers.len() > 0 {
-                                            interpret_instructions(state.clone(), args, tmps, &defers)?;
+                                            interpret_instructions(state.clone(), args, tmps, &defers, None)?;
                                         }
                                         return Ok((None, Some(l.clone())))
                                     },
@@ -1094,11 +1098,17 @@ pub fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps
                 let r = xor(state.clone(), op1.clone(), op2.clone())?;
                 set_var(state.clone(), tmps, res.clone(), r.clone())?;
             },
+            Instruction::GetPipeShorthand(res) => {
+                set_var(state.clone(), tmps, res, pipeshort.clone())?;
+            },
+            Instruction::SetPipeShorthand(op) => {
+                pipeshort = get_var(state.clone(), args, tmps, op)?;
+            },
         }
         i += 1;
     }
     if defers.len() > 0 {
-        interpret_instructions(state.clone(), args, tmps, &defers)?;
+        interpret_instructions(state.clone(), args, tmps, &defers, None)?;
     }
     Ok((None, None))
 }

@@ -1,36 +1,67 @@
 # Syntax
 
 ```
-loop {
-    // infinite
-}
+// LOOP REWORK
 
+bodu proposal: LOOP REWORK
+```
+// part 1:
+loop {
+  // runs until you break out of it
+}
 loop n {
     // runs n times
 }
-
-first {
-    // before the loop
-} loop n {
-    // runs n times
-} then {
-    // if the loop ended normally
-} else {
-    // if either first, loop, or then were broken out of
+while cond {
+  // runs while cond evaluates to true
 }
-```
-
-```
-for a in iter {
+until cond {
+  // runs until cond evaluates to true
+}
+for i in iter {
     // iterates iter
 }
+for i in iter while cond {
+    // iterates iter while cond is true
+}
+for i in iter until cond {
+    // iterates iter until cond is true
+}
+// part 2:
+before { // optional
+    // before the loop
+} loop n { // can be any loop except for `loop` loops
+    // ...
+} again { // optional
+    // ran everytime it reaches a continue statement
+} after { // optional
+    // if the loop ended normally
+} else { // optional
+    // if anything before it was broken out of
+}
+// note: all these blocks use the same scope
+// part 3:
+continue; // continues the inner most loop
+break; // breaks the inner most loop
+continue expr; // makes expr acessible to an again block when using `$$`
+break expr; // not allowed in `loop` loops; makes expr acessible to an else block when using `$$`
+```
+```
 
-for a in iter while cond {
-    // iterates iter until iter runs out of elements or cond evaluates to false
+```
+debug {
+    // only runs in debug mode
 }
 
-for a in iter until cond {
-    // works similarly to the above
+release {
+    // only runs when not in debug mode
+}
+
+// these two can be combined
+debug {
+    // ...
+} release {
+    // ...
 }
 ```
 

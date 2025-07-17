@@ -89,6 +89,7 @@ pub enum S2T {
     DecoratorFn, // [@]
     PipeFn, // [|>]
     Null, // null
+    PipeShorthand, // $
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -335,6 +336,7 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordGoto => res.push(S2T::Goto),
             S1T::KeywordFn => res.push(S2T::Fn),
             S1T::KeywordNull => res.push(S2T::Null),
+            S1T::Dollar => res.push(S2T::PipeShorthand),
         }
     }
     let s2 = res;

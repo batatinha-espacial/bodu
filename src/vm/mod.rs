@@ -118,6 +118,8 @@ pub enum Instruction {
     And(VarIndex, VarIndex, VarIndex), // result, op1, op2
     Or(VarIndex, VarIndex, VarIndex), // result, op1, op2
     Xor(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    GetPipeShorthand(VarIndex), // result
+    SetPipeShorthand(VarIndex), // op
 }
 
 #[derive(Clone, Debug)]

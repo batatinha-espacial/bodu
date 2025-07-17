@@ -59,6 +59,7 @@ pub enum S1T {
     KeywordGoto, // goto
     KeywordFn, // fn
     KeywordNull, // null
+    Dollar, // $
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -71,7 +72,7 @@ enum InsideComment {
 pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
     let mut iterr = contents.chars().peekable();
     let mut res: Vec<S1T> = Vec::new();
-    let invalid_idents = "{}+-*/%?=!~<>&|^;@()[].:,\"\'";
+    let invalid_idents = "{}+-*/%?=!~<>&|^;@()[].:,\"\'$";
     let mut inside_comment: InsideComment = InsideComment::No;
     while let Some(ch) = iterr.next() {
         match ch {
