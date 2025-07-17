@@ -7,6 +7,7 @@ use crate::vm::{make_container, make_err, op::{call, make_object, make_object_ba
 mod array;
 mod iter;
 mod os;
+mod buffer;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -50,6 +51,13 @@ pub fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "async", async_);
     make_function!(state, scope, "await", await_);
+    {
+        let buffer_obj = make_object();
+        make_function!(state, buffer_obj, "from_string_utf8", buffer::from_string_utf8);
+        make_function!(state, buffer_obj, "from_string_utf16be", buffer::from_string_utf16be);
+        make_function!(state, buffer_obj, "from_string_utf16le", buffer::from_string_utf16le);
+        set_base(state.clone(), scope.clone(), "buffer".to_string(), buffer_obj).unwrap();
+    }
     make_function!(state, scope, "eprint", eprint);
     make_function!(state, scope, "input", input);
     {
