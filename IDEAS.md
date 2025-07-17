@@ -3,8 +3,6 @@
 ```
 // LOOP REWORK
 
-bodu proposal: LOOP REWORK
-```
 // part 1:
 loop {
   // runs until you break out of it
@@ -45,7 +43,6 @@ continue; // continues the inner most loop
 break; // breaks the inner most loop
 continue expr; // makes expr acessible to an again block when using `$$`
 break expr; // not allowed in `loop` loops; makes expr acessible to an else block when using `$$`
-```
 ```
 
 ```

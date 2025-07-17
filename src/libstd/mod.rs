@@ -19,13 +19,13 @@ macro_rules! make_function {
     }};
 }
 
-pub fn new_global_state() -> StateContainer {
+pub fn new_global_state(debug: bool) -> StateContainer {
     let s = Arc::new(Mutex::new(State {
         scope: make_object(),
         parent: None,
         global: None,
         globaldata: None,
-        debug: false,
+        debug,
     }));
     let s2 = s.clone();
     s.lock().unwrap().global = Some(s2);
@@ -44,6 +44,7 @@ pub fn init_global_state(state: StateContainer) {
     let scope = state.lock().unwrap().scope.clone();
     {
         let array_object = make_object();
+        make_function!(state, array_object, "is_array", array::is_array);
         make_function!(state, array_object, "new", array::new);
         set_base(state.clone(), scope.clone(), "array".to_string(), array_object).unwrap();
     }

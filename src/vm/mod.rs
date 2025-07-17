@@ -55,7 +55,7 @@ pub fn make_container(v: Value) -> Container {
 }
 
 // the state: it contains the scope of a function and it is an execution context (kinda)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct State {
     pub scope: Container, // the scope
     pub parent: Option<StateContainer>, // parent state
@@ -64,7 +64,7 @@ pub struct State {
     pub debug: bool, // whether debug mode is active
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalData {
     pub threads: Arc<Mutex<HashMap<u64, JoinHandle<Result<Container, Container>>>>>,
     pub threadid: u64,

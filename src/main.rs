@@ -37,7 +37,7 @@ fn interpret(file: String) {
     let contents = s2(contents).unwrap();
     let contents = s3(contents).unwrap();
     let instrs = s4(contents).unwrap();
-    let state = new_global_state();
+    let state = new_global_state(false);
     init_global_state(state.clone());
     let f = make_function(state.clone(), instrs, None).unwrap();
     call(state.clone(), f, vec![]).unwrap();
@@ -45,7 +45,7 @@ fn interpret(file: String) {
 
 fn repl() {
     println!("Welcome to the Bodu REPL!");
-    let state = new_global_state();
+    let state = new_global_state(false);
     init_global_state(state.clone());
     let s = new_state(state.clone());
     let mut rl = DefaultEditor::new().unwrap();

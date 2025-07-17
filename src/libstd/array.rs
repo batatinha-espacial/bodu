@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::vm::{make_container, op::{make_object_base, make_tuple, set_base, to_number_base}, Container, Function, Gi, StateContainer, Value};
+use crate::vm::{make_container, make_err, op::{make_object_base, make_tuple, set_base, to_number_base}, Container, Function, Gi, StateContainer, Value};
 
 macro_rules! helper1 {
     ($state:expr, $fcall:expr, $o:expr, $prop:expr) => {{
@@ -20,6 +20,7 @@ pub fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container,
 
 pub fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Container, Container> {
     let mut o = make_object_base();
+    o.internals.insert(u64::MAX, make_container(Value::String("array".to_string())));
     o.externals.insert(0, Arc::new(Mutex::new(Box::new(data.clone()))));
     let o = make_container(Value::Object(o));
 
@@ -30,6 +31,28 @@ pub fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Conta
     helper1!(state, iter, o, "iter");
 
     Ok(o)
+}
+
+pub fn is_array(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("array.is_array requires 1 argument"));
+    }
+    let o = args[0].clone();
+    let o = o.lock().unwrap().clone();
+    let o = match o {
+        Value::Object(o) => o,
+        _ => return Ok(make_container(Value::Boolean(false))),
+    };
+    let o = match o.internals.get(&u64::MAX) {
+        None => return Ok(make_container(Value::Boolean(false))),
+        Some(v) => v.clone(),
+    };
+    let o = o.lock().unwrap().clone();
+    let o = match o {
+        Value::String(s) => s.clone(),
+        _ => return Ok(make_container(Value::Boolean(false))),
+    };
+    Ok(make_container(Value::Boolean(o == "array")))
 }
 
 fn get(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
