@@ -43,6 +43,7 @@ pub fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Conta
     helper1!(state, pop, o, "pop");
     helper1!(state, push, o, "push");
     helper1!(state, iter, o, "iter");
+    helper1!(state, len, o, "len");
 
     Ok(o)
 }
@@ -256,4 +257,16 @@ fn meta_to_string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
         vec_.push(to_string_base(state.clone(), i)?);
     }
     Ok(make_container(Value::String("[".to_string()+&vec_.join(", ")+&"]")))
+}
+
+fn len(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().unwrap().clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().unwrap();
+    let o = o.downcast_mut::<Vec<Container>>().unwrap();
+    Ok(make_container(Value::Number(o.len() as i64)))
 }
