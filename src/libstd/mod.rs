@@ -10,6 +10,7 @@ mod array;
 mod iter;
 mod os;
 mod buffer;
+mod json;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -72,6 +73,12 @@ pub fn init_global_state(state: StateContainer) {
         make_function!(state, iter_object, "collect", iter::collect);
         make_function!(state, iter_object, "cycle", iter::cycle);
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).unwrap();
+    }
+    {
+        let json_obj = make_object();
+        make_function!(state, json_obj, "decode", json::decode);
+        make_function!(state, json_obj, "encode", json::encode);
+        set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).unwrap();
     }
     {
         let os_object = make_object();
