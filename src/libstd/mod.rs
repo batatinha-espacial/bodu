@@ -15,12 +15,18 @@ mod event;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
-        let f = make_container(Value::Function(Function {
+        let f = make_fn!($state, $fcall);
+        set_base($state.clone(), $scope.clone(), $prop.to_string(), f).unwrap();
+    }};
+}
+
+macro_rules! make_fn {
+    ($state:expr, $fcall:expr) => {{
+        make_container(Value::Function(Function {
             internals: HashMap::new(),
             call: $fcall,
             state: $state.clone(),
-        }));
-        set_base($state.clone(), $scope.clone(), $prop.to_string(), f).unwrap();
+        }))
     }};
 }
 
@@ -56,6 +62,7 @@ pub fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "async", async_);
     make_function!(state, scope, "await", await_);
+    make_function!(state, scope, "awaifn", awaitfn);
     make_function!(state, scope, "btoa", btoa);
     {
         let buffer_obj = make_object();
@@ -205,6 +212,24 @@ fn await_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Containe
         let rt = &mut *rt.runtime.lock().unwrap();
         rt.block_on(p.into_future()).unwrap()
     }
+}
+
+fn awaitfn(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("awaitfn requires 1 argument"));
+    }
+    let mut internals = HashMap::new();
+    internals.insert(0, args[0].clone());
+    let f = make_container(Value::Function(Function {
+        internals,
+        call: |state, args, gi| {
+            let r = call(state.clone(), gi(0).unwrap().clone(), args)?;
+            let aw = make_fn!(state, await_);
+            call(state.clone(), aw, vec![r])
+        },
+        state: state.clone(),
+    }));
+    Ok(f)
 }
 
 fn string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
