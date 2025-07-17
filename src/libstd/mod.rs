@@ -1,6 +1,8 @@
 use std::{collections::HashMap, io::Write, sync::{Arc, Mutex}};
 
-use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
+use base64::Engine;
+
+use crate::{vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value}};
 
 // TODO: add comments
 
@@ -43,6 +45,7 @@ pub fn new_global_state(debug: bool) -> StateContainer {
 
 pub fn init_global_state(state: StateContainer) {
     let scope = state.lock().unwrap().scope.clone();
+    make_function!(state, scope, "atob", atob);
     {
         let array_object = make_object();
         make_function!(state, array_object, "is_array", array::is_array);
@@ -51,6 +54,7 @@ pub fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "async", async_);
     make_function!(state, scope, "await", await_);
+    make_function!(state, scope, "btoa", btoa);
     {
         let buffer_obj = make_object();
         make_function!(state, buffer_obj, "from_string_utf8", buffer::from_string_utf8);
@@ -261,4 +265,45 @@ fn range(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container
         }
     };
     Ok(make_container(Value::Function(f)))
+}
+
+fn btoa(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("btoa requires 1 argument"));
+    }
+    let data = {
+        let o = args[0].clone();
+        let o = match match o.lock().unwrap().clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("btoa requires 1 buffer")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("btoa requires 1 buffer")),
+        };
+        let mut o = o.lock().unwrap();
+        let o = match o.downcast_mut::<Vec<u8>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("btoa requires 1 buffer")),
+        };
+        o
+    };
+
+    let output = base64::engine::general_purpose::STANDARD.encode(data);
+
+    Ok(make_container(Value::String(output)))
+}
+
+fn atob(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("atob requires 1 argument"));
+    }
+    let data = to_string_base(state.clone(), args[0].clone())?;
+
+    let output = base64::engine::general_purpose::STANDARD.decode(data).map_err(|_| make_err("error decoding base64 string"))?;
+
+    buffer::new_from_vec(state.clone(), output)
 }
