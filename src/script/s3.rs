@@ -1049,19 +1049,21 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                 n += 1;
                                 *i += 1;
                                 let t = match stat_expr(input, i) {
-                                    Some((v, nn)) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n)),
+                                    Some((v, nn)) => {
+                                        n += nn;
+                                        Some((S3T::Let(s.clone(), Some(Box::new(v))), n))
+                                    },
                                     _ => None,
                                 };
                                 let t = match t {
                                     Some(t) => Some(t),
                                     _ => match expr(input, i) {
                                         Some((v, nn)) => {
-                                            *i += 1;
+                                            n += nn;
                                             match input.get(*i) {
                                                 Some(S2T::Semicolon) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n + 1)),
                                                 _ => {
                                                     *i -= nn;
-                                                    *i -= 1;
                                                     None
                                                 },
                                             }
@@ -1069,7 +1071,13 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                         _ => None,
                                     },
                                 };
-                                t
+                                match t {
+                                    Some(t) => Some(t),
+                                    None => {
+                                        *i -= n;
+                                        None
+                                    },
+                                }
                             },
                             _ => {
                                 *i -= n;

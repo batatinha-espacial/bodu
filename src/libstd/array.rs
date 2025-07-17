@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::{Arc, Mutex}};
 
-use crate::vm::{make_container, make_err, op::{make_object_base, make_tuple, set_base, to_number_base}, Container, Function, Gi, StateContainer, Value};
+use crate::vm::{make_container, make_err, op::{make_object, make_object_base, make_tuple, set_base, to_number_base, to_string_base}, Container, Function, Gi, StateContainer, Value};
 
 macro_rules! helper1 {
     ($state:expr, $fcall:expr, $o:expr, $prop:expr) => {{
@@ -14,6 +14,17 @@ macro_rules! helper1 {
     }};
 }
 
+macro_rules! helper2 {
+    ($state:expr, $fcall:expr, $o:expr, $prop:expr) => {{
+        let fn_ = Function {
+            internals: HashMap::new(),
+            call: $fcall,
+            state: $state.clone(),
+        };
+        set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_)))?;
+    }};
+}
+
 pub fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
     new_with_vec(state, Vec::new())
 }
@@ -22,6 +33,9 @@ pub fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Conta
     let mut o = make_object_base();
     o.internals.insert(u64::MAX, make_container(Value::String("array".to_string())));
     o.externals.insert(0, Arc::new(Mutex::new(Box::new(data.clone()))));
+    o.metaobj = make_object();
+    helper2!(state, meta_add, o.metaobj, "add");
+    helper2!(state, meta_to_string, o.metaobj, "to_string");
     let o = make_container(Value::Object(o));
 
     helper1!(state, get, o, "get");
@@ -164,4 +178,82 @@ fn iter(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, C
         }
     };
     Ok(make_container(Value::Function(f)))
+}
+
+fn meta_add(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("array's metaobj add requires 2 arguments"));
+    }
+    let a = {
+        let o = args[0].clone();
+        let o = match match o.lock().unwrap().clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let mut o = o.lock().unwrap();
+        let o = match o.downcast_mut::<Vec<Container>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        o
+    };
+    let b = {
+        let o = args[1].clone();
+        let o = match match o.lock().unwrap().clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let mut o = o.lock().unwrap();
+        let o = match o.downcast_mut::<Vec<Container>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        o
+    };
+    new_with_vec(state.clone(), a.into_iter().chain(b.into_iter()).collect())
+}
+
+fn meta_to_string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("array's metaobj to_string requires 1 argument"));
+    }
+    let a = {
+        let o = args[0].clone();
+        let o = match match o.lock().unwrap().clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("array's metaobj to_string requires 1 array")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj to_string requires 1 array")),
+        };
+        let mut o = o.lock().unwrap();
+        let o = match o.downcast_mut::<Vec<Container>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj to_string requires 1 array")),
+        };
+        o
+    };
+    let mut vec_ = Vec::new();
+    for i in a {
+        vec_.push(to_string_base(state.clone(), i)?);
+    }
+    Ok(make_container(Value::String("[".to_string()+&vec_.join(", ")+&"]")))
 }
