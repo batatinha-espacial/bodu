@@ -63,6 +63,7 @@ pub fn init_global_state(state: StateContainer) {
         make_function!(state, buffer_obj, "from_string_utf16le", buffer::from_string_utf16le);
         set_base(state.clone(), scope.clone(), "buffer".to_string(), buffer_obj).unwrap();
     }
+    make_function!(state, scope, "chr", chr);
     make_function!(state, scope, "eprint", eprint);
     make_function!(state, scope, "input", input);
     {
@@ -80,6 +81,7 @@ pub fn init_global_state(state: StateContainer) {
         make_function!(state, json_obj, "encode", json::encode);
         set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).unwrap();
     }
+    make_function!(state, scope, "ord", ord);
     {
         let os_object = make_object();
         make_function!(state, os_object, "name", os::name);
@@ -313,4 +315,28 @@ fn atob(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container,
     let output = base64::engine::general_purpose::STANDARD.decode(data).map_err(|_| make_err("error decoding base64 string"))?;
 
     buffer::new_from_vec(state.clone(), output)
+}
+
+fn chr(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("chr requires 1 argument"));
+    }
+    let a = to_number_base(state.clone(), args[0].clone())?;
+    let a = char::from_u32(a as u32);
+    match a {
+        Some(a) => Ok(make_container(Value::String(a.to_string()))),
+        None => Err(make_err("chr received an invalid codepoint")),
+    }
+}
+
+fn ord(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("ord requires 1 argument"));
+    }
+    let a = to_string_base(state.clone(), args[0].clone())?;
+    if a.len() == 0 {
+        Err(make_err("ord received an empty string"))
+    } else {
+        Ok(make_container(Value::Number((a.chars().next().unwrap() as u32) as i64)))
+    }
 }
