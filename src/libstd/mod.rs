@@ -82,6 +82,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, event_obj, "new", event::new);
         set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).await.unwrap();
     }
+    make_function!(state, scope, "id", id);
     make_function!(state, scope, "input", input);
     {
         let iter_object = make_object();
@@ -379,4 +380,13 @@ async fn sleep(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Con
     let n = to_number_base(state.clone(), args[0].clone()).await?;
     std::thread::sleep(std::time::Duration::from_millis(n as u64));
     Ok(make_container(Value::Null))
+}
+
+async fn id(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("id requires 1 arguemnt"));
+    }
+    let v = args[0].clone();
+    let v = &*v as *const _ as usize;
+    Ok(make_container(Value::String(format!("{:x}", v))))
 }
