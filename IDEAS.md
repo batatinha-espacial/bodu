@@ -66,6 +66,5 @@ debug {
 
 - `iter.map`: array.prototype.map (from JS) but for iterators
 - `date`: time and date library
-- `math.abs`: absolute value
 - `iter.enumerate`: same as rust
 - `iter.filter`: same as rust

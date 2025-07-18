@@ -533,6 +533,22 @@ pub async fn to_number(state: StateContainer, v: Container) -> Result<Container,
     Ok(make_container(Value::Number(to_number_base(state, v).await?)))
 }
 
+pub async fn to_float_base(state: StateContainer, v: Container) -> Result<f64, Container> {
+    let v = resolve_bind(state.clone(), v).await?.lock().await.clone();
+    match v {
+        Value::Number(n) => Ok(n as f64),
+        Value::Float(f) => Ok(f),
+        Value::Null => Ok(0.0),
+        Value::String(s) => s.parse().map_err(|_| make_container(Value::String("cannot convert v to float".to_string()))),
+        Value::Boolean(b) => Ok(if b {1.0} else {0.0}),
+        _ => Err(make_container(Value::String("cannot convert v to float".to_string()))),
+    }
+}
+
+pub async fn to_float(state: StateContainer, v: Container) -> Result<Container, Container> {
+    Ok(make_container(Value::Float(to_float_base(state, v).await?)))
+}
+
 pub fn make_object_base() -> Object {
     Object {
         props: HashMap::new(),

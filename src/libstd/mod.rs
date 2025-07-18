@@ -4,7 +4,7 @@ use base64::Engine;
 
 use tokio::sync::Mutex;
 
-use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_boolean, to_number, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
+use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_boolean, to_float, to_number, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
 
 // TODO: add comments
 
@@ -14,6 +14,7 @@ mod os;
 mod buffer;
 mod json;
 mod event;
+mod math;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -84,6 +85,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, event_obj, "new", event::new);
         set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).await.unwrap();
     }
+    make_function!(state, scope, "float", float);
     make_function!(state, scope, "hex", hex);
     make_function!(state, scope, "hex_upper", hex_upper);
     make_function!(state, scope, "id", id);
@@ -102,6 +104,11 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, json_obj, "decode", json::decode);
         make_function!(state, json_obj, "encode", json::encode);
         set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).await.unwrap();
+    }
+    {
+        let math_obj = make_object();
+        make_function!(state, math_obj, "abs", math::abs);
+        set_base(state.clone(), scope.clone(), "math".to_string(), math_obj).await.unwrap();
     }
     make_function!(state, scope, "number", number);
     make_function!(state, scope, "oct", oct);
@@ -441,4 +448,11 @@ async fn boolean(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<C
         return Err(make_err("boolean requires 1 argument"));
     }
     to_boolean(state, args[0].clone()).await
+}
+
+async fn float(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("float requires 1 argument"));
+    }
+    to_float(state, args[0].clone()).await
 }
