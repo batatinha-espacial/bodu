@@ -86,6 +86,9 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).await.unwrap();
     }
     make_function!(state, scope, "float", float);
+    make_function!(state, scope, "from_bin", from_bin);
+    make_function!(state, scope, "from_hex", from_hex);
+    make_function!(state, scope, "from_oct", from_oct);
     make_function!(state, scope, "hex", hex);
     make_function!(state, scope, "hex_upper", hex_upper);
     make_function!(state, scope, "id", id);
@@ -455,4 +458,31 @@ async fn float(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Con
         return Err(make_err("float requires 1 argument"));
     }
     to_float(state, args[0].clone()).await
+}
+
+async fn from_bin(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("from_bin requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let n = i64::from_str_radix(&s, 2).map_err(|_| make_err("from_bin couldn't parse the binary number"))?;
+    Ok(make_container(Value::Number(n)))
+}
+
+async fn from_oct(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("from_oct requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let n = i64::from_str_radix(&s, 8).map_err(|_| make_err("from_oct couldn't parse the binary number"))?;
+    Ok(make_container(Value::Number(n)))
+}
+
+async fn from_hex(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("from_hex requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let n = i64::from_str_radix(&s, 16).map_err(|_| make_err("from_hex couldn't parse the binary number"))?;
+    Ok(make_container(Value::Number(n)))
 }
