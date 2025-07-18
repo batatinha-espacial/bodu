@@ -2,30 +2,30 @@ use std::sync::Arc;
 
 use crate::{libstd::array, vm::{make_container, make_err, op::{call, make_object_base}, Container, Gi, ObjectProp, StateContainer, Value}};
 
-pub fn encode(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+pub async fn encode(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
         return Err(make_err("json.encode requires 1 argument"));
     }
     let mut visited = Vec::new();
-    let v = encode_base(state.clone(), args[0].clone(), &mut visited)?;
+    let v = encode_base(state.clone(), args[0].clone(), &mut visited).await?;
     Ok(make_container(Value::String(v.to_string())))
 }
 
-fn encode_base(state: StateContainer, v: Container, visited: &mut Vec<Container>) -> Result<serde_json::Value, Container> {
+async fn encode_base(state: StateContainer, v: Container, visited: &mut Vec<Container>) -> Result<serde_json::Value, Container> {
     if visited.iter().any(|a| Arc::ptr_eq(a, &v)) {
         return Err(make_err("json.encode was called with a cyclic object"))
     }
     visited.push(v.clone());
     let isarr = {
         let o = v.clone();
-        let o = o.lock().unwrap().clone();
+        let o = o.lock().await.clone();
         match o {
             Value::Object(o) => {
                 match o.internals.get(&u64::MAX) {
                     None => false,
                     Some(v) => {
                         let o = v.clone();
-                        let o = o.lock().unwrap().clone();
+                        let o = o.lock().await.clone();
                         match o {
                             Value::String(s) => s.clone() == "array",
                             _ => false,
@@ -36,7 +36,7 @@ fn encode_base(state: StateContainer, v: Container, visited: &mut Vec<Container>
             _ => false,
         }
     };
-    let v = &*v.lock().unwrap();
+    let v = &*v.lock().await;
     match v {
         Value::Null => Ok(serde_json::Value::Null),
         Value::Number(a) => match serde_json::Number::from_f64(*a as f64) {
@@ -57,7 +57,7 @@ fn encode_base(state: StateContainer, v: Container, visited: &mut Vec<Container>
                         Some(o) => o.clone(),
                         _ => return Err(make_err("json.encode can't encode array")),
                     };
-                    let mut o = o.lock().unwrap();
+                    let mut o = o.lock().await;
                     let o = match o.downcast_mut::<Vec<Container>>() {
                         Some(o) => o.clone(),
                         _ => return Err(make_err("json.encode can't encode array")),
@@ -65,15 +65,15 @@ fn encode_base(state: StateContainer, v: Container, visited: &mut Vec<Container>
                     o
                 };
                 for i in o {
-                    vec_.push(encode_base(state.clone(), i, visited)?);
+                    vec_.push(Box::pin(encode_base(state.clone(), i, visited)).await?);
                 }
                 Ok(serde_json::Value::Array(vec_))
             } else {
                 let mut map = serde_json::Map::new();
                 for i in o.props.iter() {
                     match i.1 {
-                        ObjectProp::Value(v) => map.insert(i.0.clone(), encode_base(state.clone(), v.clone(), visited)?),
-                        ObjectProp::GetSet(v, _) => map.insert(i.0.clone(), encode_base(state.clone(), call(state.clone(), v.clone(), Vec::new())?, visited)?),
+                        ObjectProp::Value(v) => map.insert(i.0.clone(), Box::pin(encode_base(state.clone(), v.clone(), visited)).await?),
+                        ObjectProp::GetSet(v, _) => map.insert(i.0.clone(), Box::pin(encode_base(state.clone(), call(state.clone(), v.clone(), Vec::new()).await?, visited)).await?),
                     };
                 }
                 Ok(serde_json::Value::Object(map))
@@ -83,20 +83,20 @@ fn encode_base(state: StateContainer, v: Container, visited: &mut Vec<Container>
     }
 }
 
-pub fn decode(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+pub async fn decode(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
         return Err(make_err("json.decode requires 1 argument"));
     }
     let a = args[0].clone();
-    let a = match a.lock().unwrap().clone() {
+    let a = match a.lock().await.clone() {
         Value::String(s) => s,
         _ => return Err(make_err("json.decode requires 1 string")),
     };
     let v: serde_json::Value = serde_json::from_str(&a).map_err(|_| make_err("json.decode couldn't decode the JSON string"))?;
-    decode_base(state.clone(), v)
+    decode_base(state.clone(), v).await
 }
 
-fn decode_base(state: StateContainer, v: serde_json::Value) -> Result<Container, Container> {
+async fn decode_base(state: StateContainer, v: serde_json::Value) -> Result<Container, Container> {
     match v {
         serde_json::Value::Null => Ok(make_container(Value::Null)),
         serde_json::Value::Number(a) => {
@@ -111,14 +111,14 @@ fn decode_base(state: StateContainer, v: serde_json::Value) -> Result<Container,
         serde_json::Value::Array(a) => {
             let mut vec_ = Vec::new();
             for i in a {
-                vec_.push(decode_base(state.clone(), i)?);
+                vec_.push(Box::pin(decode_base(state.clone(), i)).await?);
             }
-            array::new_with_vec(state.clone(), vec_)
+            array::new_with_vec(state.clone(), vec_).await
         },
         serde_json::Value::Object(a) => {
             let mut obj = make_object_base();
             for i in a {
-                obj.props.insert(i.0.clone(), ObjectProp::Value(decode_base(state.clone(), i.1)?));
+                obj.props.insert(i.0.clone(), ObjectProp::Value(Box::pin(decode_base(state.clone(), i.1)).await?));
             }
             Ok(make_container(Value::Object(obj)))
         },

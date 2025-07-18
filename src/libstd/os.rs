@@ -14,6 +14,6 @@ fn name_base() -> String {
     }
 }
 
-pub fn name(_: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
+pub async fn name(_: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
     Ok(make_container(Value::String(name_base())))
 }

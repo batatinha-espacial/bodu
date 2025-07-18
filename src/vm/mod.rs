@@ -1,6 +1,6 @@
-use std::{any::Any, collections::HashMap, sync::{Arc, Mutex}};
+use std::{any::Any, collections::HashMap, pin::Pin, sync::Arc};
 
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::{sync::Mutex, task::JoinHandle};
 
 // standard operations that bodu code can do
 pub mod op;
@@ -36,13 +36,13 @@ pub enum ObjectProp {
 }
 
 // gets the function's internal values
-pub type Gi = Arc<dyn Fn(u64) -> Option<Container>>;
+pub type Gi = Arc<dyn Fn(u64) -> Option<Container> + Sync + Send>;
 
 // functions
 #[derive(Clone, Debug)]
 pub struct Function {
     pub internals: HashMap<u64, Container>, // internal values used by the function
-    pub call: fn(StateContainer, Vec<Container>, Gi) -> Result<Container, Container>, // the actual function
+    pub call: fn(StateContainer, Vec<Container>, Gi) -> Pin<Box<dyn Future<Output = Result<Container, Container>> + Send>>, // the actual function
     pub state: StateContainer, // the state it runs on
 }
 
@@ -64,13 +64,11 @@ pub struct State {
     pub debug: bool, // whether debug mode is active
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GlobalData {
-    pub threads: Arc<Mutex<HashMap<u64, JoinHandle<Result<Container, Container>>>>>,
+    pub threads: HashMap<u64, JoinHandle<Result<Container, Container>>>,
     pub threadid: u64,
-    pub threadsvec: Vec<u64>,
     pub exitcode: u8,
-    pub runtime: Arc<Mutex<Runtime>>,
 }
 
 // Container but for States
@@ -136,7 +134,7 @@ pub enum Label {
 }
 
 // type for object externals
-pub type SharedAny = Arc<Mutex<Box<dyn Any + Send>>>;
+pub type SharedAny = Arc<Mutex<Box<dyn Any + Send + Sync>>>;
 
 // makes an error, could be a macro
 pub fn make_err(v: &str) -> Container {

@@ -2,7 +2,10 @@ use bodu::{libstd::{init_global_state, new_global_state}, script::{s1::s1, s2::s
 use clap::{Arg, Command};
 use rustyline::DefaultEditor;
 
-fn main() {
+#[tokio::main]
+async fn main() {
+    let local = tokio::task::LocalSet::new();
+    local.enter();
     let mut cmd = Command::new("bodu")
         .subcommand(
             Command::new("run")
@@ -22,32 +25,32 @@ fn main() {
     if let Some(_) = matches.subcommand_matches("version") {
         println!("Bodu 0.1.0");
     } else if let Some(_) = matches.subcommand_matches("repl") {
-        repl();
+        repl().await;
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let file = matches.get_one::<String>("file").unwrap();
-        interpret(file.clone());
+        interpret(file.clone()).await;
     } else {
         cmd.print_help().unwrap();
     }
 }
 
-fn interpret(file: String) {
+async fn interpret(file: String) {
     let contents = std::fs::read_to_string(file).unwrap();
     let contents = s1(contents).unwrap();
     let contents = s2(contents).unwrap();
     let contents = s3(contents).unwrap();
     let instrs = s4(contents).unwrap();
-    let state = new_global_state(false);
-    init_global_state(state.clone());
-    let f = make_function(state.clone(), instrs, None).unwrap();
-    call(state.clone(), f, vec![]).unwrap();
+    let state = new_global_state(false).await;
+    init_global_state(state.clone()).await;
+    let f = make_function(state.clone(), instrs, None).await.unwrap();
+    call(state.clone(), f, vec![]).await.unwrap();
 }
 
-fn repl() {
+async fn repl() {
     println!("Welcome to the Bodu REPL!");
-    let state = new_global_state(false);
-    init_global_state(state.clone());
-    let s = new_state(state.clone());
+    let state = new_global_state(false).await;
+    init_global_state(state.clone()).await;
+    let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();
     loop {
         let line = rl.readline(">> ");
@@ -82,18 +85,18 @@ fn repl() {
                         continue;
                     },
                 };
-                let f = match make_function(state.clone(), line, Some(s.clone())) {
+                let f = match make_function(state.clone(), line, Some(s.clone())).await {
                     Ok(f) => f,
                     Err(e) => {
-                        let e = to_string_base(state.clone(), e).unwrap();
+                        let e = to_string_base(state.clone(), e).await.unwrap();
                         println!("Error while compiling into function: {}", e);
                         continue;
                     },
                 };
-                match call(state.clone(), f, vec![]) {
+                match call(state.clone(), f, vec![]).await {
                     Ok(_) => {},
                     Err(e) => {
-                        let e = match to_string_base(state.clone(), e) {
+                        let e = match to_string_base(state.clone(), e).await {
                             Ok(e) => e,
                             Err(_) => {
                                 println!("Error while converting error to string.");

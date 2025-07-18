@@ -1,4 +1,6 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::Arc};
+
+use tokio::sync::Mutex;
 
 use crate::vm::{make_container, make_err, op::{call, eql_base, make_object_base, set_base, to_string_base}, Container, Function, Gi, StateContainer, Value};
 
@@ -23,19 +25,23 @@ macro_rules! helper1 {
     ($state:expr, $fcall:expr, $o:expr, $prop:expr) => {{
         let mut fn_ = Function {
             internals: HashMap::new(),
-            call: $fcall,
+            call: |state, args, gi| {
+                Box::pin(async move {
+                    $fcall(state, args, gi).await
+                })
+            },
             state: $state.clone(),
         };
         fn_.internals.insert(0, $o.clone());
-        set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_)))?;
+        set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_))).await?;
     }};
 }
 
-pub fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
-    new_base(state.clone())
+pub async fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    new_base(state.clone()).await
 }
 
-pub fn new_base(state: StateContainer) -> Result<Container, Container> {
+pub async fn new_base(state: StateContainer) -> Result<Container, Container> {
     let events_data = EventsData {
         data: HashMap::new(),
     };
@@ -64,19 +70,19 @@ fn init_event(events_data: &mut EventsData, name: String) {
     }
 }
 
-fn on(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn on(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() < 2 {
         return Err(make_err("event.on requires 2 arguments"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     let f = args[1].clone();
     init_event(o, name.clone());
     let event = o.data.get_mut(&name).unwrap();
@@ -84,19 +90,19 @@ fn on(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, 
     Ok(f.clone())
 }
 
-fn once(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn once(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() < 2 {
         return Err(make_err("event.once requires 2 arguments"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     let f = args[1].clone();
     init_event(o, name.clone());
     let event = o.data.get_mut(&name).unwrap();
@@ -104,19 +110,19 @@ fn once(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container
     Ok(f.clone())
 }
 
-fn off(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn off(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() < 2 {
         return Err(make_err("event.off requires 2 arguments"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     let f = args[1].clone();
     init_event(o, name.clone());
     let event = o.data.get_mut(&name).unwrap();
@@ -125,14 +131,14 @@ fn off(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container,
     for i in event.listeners.iter() {
         match i {
             Listener::On(a) => {
-                if eql_base(state.clone(), f.clone(), a.clone())? {
+                if eql_base(state.clone(), f.clone(), a.clone()).await? {
                     r = true;
                 } else {
                     listeners.push(i.clone());
                 }
             },
             Listener::Once(a) => {
-                if eql_base(state.clone(), f.clone(), a.clone())? {
+                if eql_base(state.clone(), f.clone(), a.clone()).await? {
                     r = true;
                 } else {
                     listeners.push(i.clone());
@@ -144,90 +150,90 @@ fn off(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container,
     Ok(make_container(Value::Boolean(r)))
 }
 
-fn isactive(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn isactive(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() == 0 {
         return Err(make_err("event.isactive requires 1 argument"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     init_event(o, name.clone());
     Ok(make_container(Value::Boolean(o.data.get_mut(&name).unwrap().active)))
 }
 
-fn activate(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn activate(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() == 0 {
         return Err(make_err("event.activate requires 1 argument"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     init_event(o, name.clone());
     o.data.get_mut(&name).unwrap().active = true;
     Ok(make_container(Value::Null))
 }
 
-fn deactivate(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn deactivate(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() == 0 {
         return Err(make_err("event.deactivate requires 1 argument"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     init_event(o, name.clone());
     o.data.get_mut(&name).unwrap().active = false;
     Ok(make_container(Value::Null))
 }
 
-fn clear(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn clear(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() == 0 {
         return Err(make_err("event.clear requires 1 argument"));
     }
-    let name = to_string_base(state.clone(), args[0].clone())?;
+    let name = to_string_base(state.clone(), args[0].clone()).await?;
     o.data.remove(&name);
     Ok(make_container(Value::Null))
 }
 
-fn emit(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn emit(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<EventsData>().unwrap();
     if args.len() == 0 {
         return Err(make_err("event.emit requires at least 1 argument"));
     }
     let mut args = args.clone();
-    let name = to_string_base(state.clone(), args.remove(0))?;
+    let name = to_string_base(state.clone(), args.remove(0)).await?;
     init_event(o, name.clone());
     let event = o.data.get_mut(&name).unwrap();
     if !event.active {
