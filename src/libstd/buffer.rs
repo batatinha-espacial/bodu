@@ -72,6 +72,7 @@ pub async fn new_from_vec(state: StateContainer, data: Vec<u8>) -> Result<Contai
     let o = make_container(Value::Object(o));
     helper1!(state, get, o, "get");
     helper1!(state, len, o, "len");
+    helper1!(state, to_string_utf8, o, "to_string_utf8");
     
     Ok(o)
 }
@@ -136,4 +137,20 @@ async fn meta_to_string(_: StateContainer, args: Vec<Container>, _: Gi) -> Resul
     };
     let a = a.iter().map(|v| v.to_string()).collect::<Vec<_>>();
     Ok(make_container(Value::String("<buffer ".to_string() + &a.join(" ") + ">")))
+}
+
+async fn to_string_utf8(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<u8>>().unwrap();
+    let s = String::from_utf8(o.clone());
+    match s {
+        Ok(s) => Ok(make_container(Value::String(s))),
+        Err(_) => Err(make_err("buffer.to_string_utf8 can't decode invalid utf8")),
+    }
 }
