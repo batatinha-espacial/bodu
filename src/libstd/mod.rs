@@ -4,7 +4,7 @@ use base64::Engine;
 
 use tokio::sync::Mutex;
 
-use crate::{vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value}};
+use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_boolean, to_number, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
 
 // TODO: add comments
 
@@ -68,6 +68,7 @@ pub async fn init_global_state(state: StateContainer) {
     make_function!(state, scope, "await", await_);
     make_function!(state, scope, "awaitfn", awaitfn);
     make_function!(state, scope, "bin", bin);
+    make_function!(state, scope, "boolean", boolean);
     make_function!(state, scope, "btoa", btoa);
     {
         let buffer_obj = make_object();
@@ -102,6 +103,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, json_obj, "encode", json::encode);
         set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).await.unwrap();
     }
+    make_function!(state, scope, "number", number);
     make_function!(state, scope, "oct", oct);
     make_function!(state, scope, "ord", ord);
     {
@@ -425,4 +427,18 @@ async fn hex_upper(state: StateContainer, args: Vec<Container>, _: Gi) -> Result
     }
     let n = to_number_base(state.clone(), args[0].clone()).await?;
     Ok(make_container(Value::String(format!("{:X}", n))))
+}
+
+async fn number(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("number requires 1 argument"));
+    }
+    to_number(state, args[0].clone()).await
+}
+
+async fn boolean(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("boolean requires 1 argument"));
+    }
+    to_boolean(state, args[0].clone()).await
 }

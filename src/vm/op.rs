@@ -529,6 +529,10 @@ pub async fn to_number_base(state: StateContainer, v: Container) -> Result<i64, 
     }
 }
 
+pub async fn to_number(state: StateContainer, v: Container) -> Result<Container, Container> {
+    Ok(make_container(Value::Number(to_number_base(state, v).await?)))
+}
+
 pub fn make_object_base() -> Object {
     Object {
         props: HashMap::new(),
