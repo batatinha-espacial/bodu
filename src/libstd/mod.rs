@@ -67,6 +67,7 @@ pub async fn init_global_state(state: StateContainer) {
     make_function!(state, scope, "async", async_);
     make_function!(state, scope, "await", await_);
     make_function!(state, scope, "awaitfn", awaitfn);
+    make_function!(state, scope, "bin", bin);
     make_function!(state, scope, "btoa", btoa);
     {
         let buffer_obj = make_object();
@@ -82,6 +83,8 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, event_obj, "new", event::new);
         set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).await.unwrap();
     }
+    make_function!(state, scope, "hex", hex);
+    make_function!(state, scope, "hex_upper", hex_upper);
     make_function!(state, scope, "id", id);
     make_function!(state, scope, "input", input);
     {
@@ -99,6 +102,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, json_obj, "encode", json::encode);
         set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).await.unwrap();
     }
+    make_function!(state, scope, "oct", oct);
     make_function!(state, scope, "ord", ord);
     {
         let os_object = make_object();
@@ -389,4 +393,36 @@ async fn id(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container,
     let v = args[0].clone();
     let v = &*v as *const _ as usize;
     Ok(make_container(Value::String(format!("{:x}", v))))
+}
+
+async fn bin(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("bin requires 1 arguemnt"));
+    }
+    let n = to_number_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(format!("{:b}", n))))
+}
+
+async fn oct(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("oct requires 1 arguemnt"));
+    }
+    let n = to_number_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(format!("{:o}", n))))
+}
+
+async fn hex(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("hex requires 1 arguemnt"));
+    }
+    let n = to_number_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(format!("{:x}", n))))
+}
+
+async fn hex_upper(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("hex_upper requires 1 arguemnt"));
+    }
+    let n = to_number_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(format!("{:X}", n))))
 }
