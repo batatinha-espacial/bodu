@@ -67,8 +67,5 @@ debug {
 - `iter.map`: array.prototype.map (from JS) but for iterators
 - `date`: time and date library
 - `math.abs`: absolute value
-- `bin`: integer to binary string
 - `iter.enumerate`: same as rust
 - `iter.filter`: same as rust
-- `hex`: integer to hexadecimal string
-- `oct`: integer to octal string
