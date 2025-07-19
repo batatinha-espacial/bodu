@@ -15,6 +15,7 @@ mod buffer;
 mod json;
 mod event;
 mod math;
+mod object;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -51,6 +52,7 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
         threads: HashMap::new(),
         threadid: 0,
         exitcode: 0,
+        reqwest: reqwest::Client::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s
@@ -166,6 +168,11 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "math".to_string(), math_obj).await.unwrap();
     }
     make_function!(state, scope, "number", number);
+    {
+        let obj_obj = make_object();
+        make_function!(state, obj_obj, "new", object::new);
+        set_base(state.clone(), scope.clone(), "object".to_string(), obj_obj).await.unwrap();
+    }
     make_function!(state, scope, "oct", oct);
     make_function!(state, scope, "ord", ord);
     {
