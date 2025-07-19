@@ -203,6 +203,7 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
             ']' => res.push(S1T::CloseBrack),
             '@' => res.push(S1T::At),
             ',' => res.push(S1T::Comma),
+            '$' => res.push(S1T::Dollar),
             _ => {
                 let str = iter::once(ch)
                     .chain(from_fn_variable_len(|| {
