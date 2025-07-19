@@ -1,6 +1,4 @@
-use crate::{script::s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, VarIndex}};
-
-// TODO: Pipe, OrThat, OperatorFn, MultiLet, PipeShorthand
+use crate::{script::s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, Operator, VarIndex}};
 
 pub fn s4(input: Vec<S3T>) -> Result<Vec<Instruction>, String> {
     let mut tempi: u64 = 1; // outi = 0
@@ -28,6 +26,7 @@ fn stat(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Detuple(a, b) => detuple(a, b, res, tempi, labeli, outi, outli)?,
         S3T::LetDetuple(a, b) => let_detuple(a, b, res, tempi, labeli, outi, outli)?,
         S3T::Decorator(d, f) => decorator(d, f, res, tempi, labeli, outi, outli)?,
+        S3T::MultiLet(s) => multilet(s, res)?,
         S3T::Function(a, b, c) => {
             let i = fn_(b, c, res, tempi)?;
             if let Some(name) = a {
@@ -73,7 +72,11 @@ fn expr(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Property(a, b) => prop(a, b, res, tempi, labeli, outi, outli),
         S3T::Tuple(a) => tuple(a, res, tempi, labeli, outi, outli),
         S3T::FnCall(a, b) => fn_call(a, b, res, tempi, labeli, outi, outli),
+        S3T::Pipe(a, b) => pipe(a, b, res, tempi, labeli, outi, outli),
+        S3T::OrThat(a, b) => orthat(a, b, res, tempi, labeli, outi, outli),
+        S3T::OperatorFn(op) => operatorfn(op, res, tempi),
         S3T::Null => null(tempi),
+        S3T::PipeShorthand => pipe_shorthand(res, tempi),
         _ => Err("invalid expression".to_string()),
     }
 }
@@ -615,8 +618,176 @@ fn decorator(d: Box<S3T>, f: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut u
     }
 }
 
+fn includes_fnshorthand(v: Box<S3T>) -> bool {
+    match *v {
+        S3T::Let(_, v) => {
+            if let Some(v) = v {
+                includes_fnshorthand(v)
+            } else {
+                false
+            }
+        },
+        S3T::If(vec_, v) => {
+            let mut b = false;
+            for i in vec_ {
+                b = b || includes_fnshorthand(i.1);
+                for i in i.2 {
+                    b = b || includes_fnshorthand(Box::new(i));
+                }
+            }
+            if let Some(v) = v {
+                for i in v {
+                    b = b || includes_fnshorthand(Box::new(i));
+                }
+            }
+            b
+        },
+        S3T::Block(v) => {
+            let mut b = false;
+            for i in v {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::Out(v) => includes_fnshorthand(v),
+        S3T::TryCatchFinally(v1, _, v2, v3) => {
+            let mut b = false;
+            for i in v1 {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            for i in v2 {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            if let Some(v3) = v3 {
+                for i in v3 {
+                    b = b || includes_fnshorthand(Box::new(i));
+                }
+            }
+            b
+        },
+        S3T::Return(v) => includes_fnshorthand(v),
+        S3T::Throw(v) => includes_fnshorthand(v),
+        S3T::Loop(v) => {
+            let mut b = false;
+            for i in v {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::WhileUntil(_, v1, v2) => {
+            let mut b = includes_fnshorthand(v1);
+            for i in v2 {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::Defer(v) => {
+            let mut b = false;
+            for i in v {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::Bind(_, v) => includes_fnshorthand(v),
+        S3T::Assign(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Plus(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Minus(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Negate(v) => includes_fnshorthand(v),
+        S3T::Times(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Divide(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Modulus(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Ternary(v1, v2, v3) => includes_fnshorthand(v1) || includes_fnshorthand(v2) || includes_fnshorthand(v3),
+        S3T::EqualTo(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Not(v) => includes_fnshorthand(v),
+        S3T::NotEqualTo(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Less(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::LessOrEqual(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Greater(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::GreaterOrEqual(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::And(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Or(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Xor(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Property(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::Tuple(v) => {
+            let mut b = false;
+            for i in v {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::Detuple(v1, v2) => {
+            let mut b = includes_fnshorthand(v2);
+            for i in v1 {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::LetDetuple(_, v) => includes_fnshorthand(v),
+        S3T::FnCall(v1, v2) => {
+            let mut b = includes_fnshorthand(v1);
+            for i in v2 {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
+        S3T::Decorator(v, _) => includes_fnshorthand(v),
+        S3T::Pipe(v, _) => includes_fnshorthand(v),
+        S3T::OrThat(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
+        S3T::PipeShorthand => true,
+        _ => false,
+    }
+}
+
+fn pipe(left: Box<S3T>, right: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, outi: u64, outli: u64) -> Result<VarIndex, String> {
+    if includes_fnshorthand(right.clone()) {
+        let left = expr(*left, res, tempi, labeli, outi, outli)?;
+        res.push(Instruction::SetPipeShorthand(left));
+        let right = expr(*right, res, tempi, labeli, outi, outli)?;
+        let i = null(tempi)?;
+        res.push(Instruction::SetPipeShorthand(i));
+        Ok(right)
+    } else {
+        let left = expr(*left, res, tempi, labeli, outi, outli)?;
+        let right = expr(*right.clone(), res, tempi, labeli, outi, outli)?;
+        let i = *tempi;
+        *tempi += 1;
+        res.push(Instruction::Call(VarIndex::Temp(i), right, vec![left]));
+        Ok(VarIndex::Temp(i))
+    }
+}
+
+fn orthat(left: Box<S3T>, right: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, outi: u64, outli: u64) -> Result<VarIndex, String> {
+    let left = expr(*left, res, tempi, labeli, outi, outli)?;
+    let right = expr(*right, res, tempi, labeli, outi, outli)?;
+    let vi = *tempi;
+    *tempi += 1;
+    res.push(Instruction::OrThat(VarIndex::Temp(vi), left, right));
+    Ok(VarIndex::Temp(vi))
+}
+
+fn operatorfn(operator: Operator, res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let vi = *tempi;
+    *tempi += 1;
+    res.push(Instruction::OperatorFn(VarIndex::Temp(vi), operator));
+    Ok(VarIndex::Temp(vi))
+}
+
+fn multilet(v: Vec<String>, res: &mut Vec<Instruction>) -> Result<(), String> {
+    for i in v {
+        res.push(Instruction::Decl(VarIndex::Ident(i)));
+    }
+    Ok(())
+}
+
 fn null(tempi: &mut u64) -> Result<VarIndex, String> {
     let r = *tempi;
     *tempi += 1;
+    Ok(VarIndex::Temp(r))
+}
+
+fn pipe_shorthand(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    res.push(Instruction::GetPipeShorthand(VarIndex::Temp(r)));
     Ok(VarIndex::Temp(r))
 }

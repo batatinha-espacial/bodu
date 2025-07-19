@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, pin::Pin};
 
 use tokio::sync::Mutex;
 
-use crate::vm::{make_container, make_err, Container, Function, Gi, Instruction, Label, Object, ObjectProp, State, StateContainer, Value, VarIndex};
+use crate::vm::{make_container, make_err, opfn, Container, Function, Gi, Instruction, Label, Object, ObjectProp, Operator, State, StateContainer, Value, VarIndex};
 
 // TODO: add comments
 
@@ -694,6 +694,16 @@ pub async fn xor(state: StateContainer, a: Container, b: Container) -> Result<Co
     }
 }
 
+pub async fn orthat(state: StateContainer, a: Container, b: Container) -> Result<Container, Container> {
+    let x = resolve_bind(state.clone(), a).await?;
+    let b = resolve_bind(state.clone(), b).await?;
+    let a = x.lock().await.clone();
+    match a {
+        Value::Null => Ok(b),
+        _ => Ok(x),
+    }
+}
+
 fn make_function_call(state: StateContainer, args: Vec<Container>, gi: Gi) -> Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
     Box::pin(async move {
         let state = state.clone();
@@ -822,6 +832,20 @@ pub async fn detuple(state: StateContainer, v: Container) -> Result<Vec<Containe
         Value::Tuple(v) => Ok(v),
         _ => Ok(vec![x]),
     }
+}
+
+macro_rules! make_fn {
+    ($state:expr, $fcall:expr) => {{
+        make_container(Value::Function(Function {
+            internals: HashMap::new(),
+            call: |state, args, gi| {
+                Box::pin(async move {
+                    $fcall(state, args, gi).await
+                })
+            },
+            state: $state.clone(),
+        }))
+    }};
 }
 
 pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>, tmps: &mut HashMap<u64, Container>, instrs: &Vec<Instruction>, pipeshort: Option<Container>) -> Result<(Option<Container>, Option<Label>), Container> {
@@ -1141,6 +1165,37 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
             },
             Instruction::SetPipeShorthand(op) => {
                 pipeshort = get_var(state.clone(), args, tmps, op).await?;
+            },
+            Instruction::OrThat(res, op1, op2) => {
+                let op1 = get_var(state.clone(), args, tmps, op1.clone()).await?;
+                let op2 = get_var(state.clone(), args, tmps, op2.clone()).await?;
+                let r = orthat(state.clone(), op1.clone(), op2.clone()).await?;
+                set_var(state.clone(), tmps, res.clone(), r.clone()).await?;
+            },
+            Instruction::OperatorFn(res, op) => {
+                let f = match op {
+                    Operator::Plus => make_fn!(state, opfn::plus),
+                    Operator::Minus => make_fn!(state, opfn::minus),
+                    Operator::Times => make_fn!(state, opfn::times),
+                    Operator::Divide => make_fn!(state, opfn::divide_),
+                    Operator::Modulus => make_fn!(state, opfn::modulus),
+                    Operator::OrThat => make_fn!(state, opfn::orthat_),
+                    Operator::Ternary => make_fn!(state, opfn::ternary),
+                    Operator::EqualTo => make_fn!(state, opfn::equalto),
+                    Operator::Not => make_fn!(state, opfn::not_),
+                    Operator::NotEqualTo => make_fn!(state, opfn::notequalto),
+                    Operator::Less => make_fn!(state, opfn::less),
+                    Operator::LessOrEqual => make_fn!(state, opfn::lessorequal),
+                    Operator::Greater => make_fn!(state, opfn::greater),
+                    Operator::GreaterOrEqual => make_fn!(state, opfn::greaterorequal),
+                    Operator::And => make_fn!(state, opfn::and_),
+                    Operator::Or => make_fn!(state, opfn::or_),
+                    Operator::Xor => make_fn!(state, opfn::xor_),
+                    Operator::Property => make_fn!(state, opfn::property),
+                    Operator::Tuple => make_fn!(state, opfn::tuple),
+                    Operator::Pipe => make_fn!(state, opfn::pipe),
+                };
+                set_var(state.clone(), tmps, res, f).await?;
             },
         }
         i += 1;

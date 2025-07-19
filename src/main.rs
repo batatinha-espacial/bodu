@@ -52,6 +52,7 @@ async fn repl() {
     init_global_state(state.clone()).await;
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();
+    let d = false; // change this if you need to debug the parser
     loop {
         let line = rl.readline(">> ");
         match line {
@@ -64,6 +65,9 @@ async fn repl() {
                         continue;
                     },
                 };
+                if d {
+                    println!("S1: {:#?}", line);
+                }
                 let line = match s2(line) {
                     Ok(s) => s,
                     Err(s) => {
@@ -71,6 +75,9 @@ async fn repl() {
                         continue;
                     },
                 };
+                if d {
+                    println!("S2: {:#?}", line);
+                }
                 let line = match s3(line) {
                     Ok(s) => s,
                     Err(s) => {
@@ -78,6 +85,9 @@ async fn repl() {
                         continue;
                     },
                 };
+                if d {
+                    println!("S3: {:#?}", line);
+                }
                 let line = match s4(line) {
                     Ok(s) => s,
                     Err(s) => {
@@ -85,6 +95,9 @@ async fn repl() {
                         continue;
                     },
                 };
+                if d {
+                    println!("S4: {:#?}", line);
+                }
                 let f = match make_function(state.clone(), line, Some(s.clone())).await {
                     Ok(f) => f,
                     Err(e) => {

@@ -86,7 +86,6 @@ pub enum S2T {
     XorFn, // [^]
     PropertyFn, // [.]
     TupleFn, // [,]
-    DecoratorFn, // [@]
     PipeFn, // [|>]
     Null, // null
     PipeShorthand, // $
@@ -366,7 +365,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                         S2T::Xor => true,
                         S2T::Dot => true,
                         S2T::Comma => true,
-                        S2T::At => true,
                         S2T::Pipe => true,
                         _ => false,
                     }
@@ -467,10 +465,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                         },
                         S2T::Comma => {
                             opfn_helper(&mut iterr, S2T::TupleFn, S2T::Comma, &mut res);
-                            continue;
-                        },
-                        S2T::At => {
-                            opfn_helper(&mut iterr, S2T::DecoratorFn, S2T::At, &mut res);
                             continue;
                         },
                         S2T::Pipe => {

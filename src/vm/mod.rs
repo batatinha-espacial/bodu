@@ -2,8 +2,8 @@ use std::{any::Any, collections::HashMap, pin::Pin, sync::Arc};
 
 use tokio::{sync::Mutex, task::JoinHandle};
 
-// standard operations that bodu code can do
-pub mod op;
+pub mod op; // standard operations that bodu code can do
+pub mod opfn;
 
 // bodu values. those are often wrapped in Arc<Mutex<T>>s.
 #[derive(Clone, Debug)]
@@ -118,6 +118,8 @@ pub enum Instruction {
     Xor(VarIndex, VarIndex, VarIndex), // result, op1, op2
     GetPipeShorthand(VarIndex), // result
     SetPipeShorthand(VarIndex), // op
+    OrThat(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    OperatorFn(VarIndex, Operator), // result, opfn
 }
 
 #[derive(Clone, Debug)]
@@ -139,4 +141,29 @@ pub type SharedAny = Arc<Mutex<Box<dyn Any + Send + Sync>>>;
 // makes an error, could be a macro
 pub fn make_err(v: &str) -> Container {
     make_container(Value::String(v.to_string()))
+}
+
+// used for operator functions
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Operator {
+    Plus, // +
+    Minus, // -
+    Times, // *
+    Divide, // /
+    Modulus, // %
+    OrThat, // ??
+    Ternary, // ?:
+    EqualTo, // ==
+    Not, // !
+    NotEqualTo, // !=
+    Less, // <
+    LessOrEqual, // <=
+    Greater, // >
+    GreaterOrEqual, // >=
+    And, // &
+    Or, // |
+    Xor, // ^
+    Property, // .
+    Tuple, // ,
+    Pipe, // |>
 }
