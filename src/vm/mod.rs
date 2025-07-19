@@ -69,7 +69,6 @@ pub struct GlobalData {
     pub threads: HashMap<u64, JoinHandle<Result<Container, Container>>>,
     pub threadid: u64,
     pub exitcode: u8,
-    pub reqwest: reqwest::Client,
 }
 
 // Container but for States

@@ -52,7 +52,6 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
         threads: HashMap::new(),
         threadid: 0,
         exitcode: 0,
-        reqwest: reqwest::Client::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s
