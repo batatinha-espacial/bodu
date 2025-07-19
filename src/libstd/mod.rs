@@ -177,6 +177,7 @@ pub async fn init_global_state(state: StateContainer) {
     make_function!(state, scope, "range", range);
     make_function!(state, scope, "sleep", sleep);
     make_function!(state, scope, "string", string);
+    make_function!(state, scope, "type", type_);
 }
 
 async fn print(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -537,4 +538,22 @@ async fn from_hex(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
     let s = to_string_base(state.clone(), args[0].clone()).await?;
     let n = i64::from_str_radix(&s, 16).map_err(|_| make_err("from_hex couldn't parse the binary number"))?;
     Ok(make_container(Value::Number(n)))
+}
+
+async fn type_(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("type requires 1 argument"));
+    }
+    let v = args[0].clone().lock().await.clone();
+    Ok(make_container(Value::String(match v {
+        Value::Number(_) => "number".to_string(),
+        Value::Float(_) => "float".to_string(),
+        Value::Null => "null".to_string(),
+        Value::String(_) => "string".to_string(),
+        Value::Boolean(_) => "boolean".to_string(),
+        Value::Object(_) => "object".to_string(),
+        Value::Tuple(_) => "tuple".to_string(),
+        Value::Function(_) => "function".to_string(),
+        Value::Bind(_) => return Err(make_err("type failed to get type of value")),
+    })))
 }
