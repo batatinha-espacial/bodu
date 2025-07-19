@@ -1,6 +1,6 @@
 use crate::{script::s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, VarIndex}};
 
-// TODO: Decorator, Pipe, OrThat, OperatorFn, MultiLet, PipeShorthand
+// TODO: Pipe, OrThat, OperatorFn, MultiLet, PipeShorthand
 
 pub fn s4(input: Vec<S3T>) -> Result<Vec<Instruction>, String> {
     let mut tempi: u64 = 1; // outi = 0
@@ -27,6 +27,7 @@ fn stat(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Assign(a, b) => assign(a, b, res, tempi, labeli, outi, outli)?,
         S3T::Detuple(a, b) => detuple(a, b, res, tempi, labeli, outi, outli)?,
         S3T::LetDetuple(a, b) => let_detuple(a, b, res, tempi, labeli, outi, outli)?,
+        S3T::Decorator(d, f) => decorator(d, f, res, tempi, labeli, outi, outli)?,
         S3T::Function(a, b, c) => {
             let i = fn_(b, c, res, tempi)?;
             if let Some(name) = a {
@@ -596,6 +597,22 @@ fn fn_call(v: Box<S3T>, args: Vec<S3T>, res: &mut Vec<Instruction>, tempi: &mut 
     *tempi += 1;
     res.push(Instruction::Call(VarIndex::Temp(vi), v, args));
     Ok(VarIndex::Temp(vi))
+}
+
+fn decorator(d: Box<S3T>, f: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, outi: u64, outli: u64) -> Result<(), String> {
+    let d = expr(*d, res, tempi, labeli, outi, outli)?;
+    match *f {
+        S3T::Function(Some(name), args, body) => {
+            let i = fn_(args, body, res, tempi)?;
+            let i2 = *tempi;
+            *tempi += 1;
+            res.push(Instruction::Call(VarIndex::Temp(i2), d, vec![i]));
+            res.push(Instruction::Decl(VarIndex::Ident(name.clone())));
+            res.push(Instruction::Assign(VarIndex::Ident(name.clone()), VarIndex::Temp(i2)));
+            Ok(())
+        },
+        _ => Err("decorators can only be used with named functions".to_string()),
+    }
 }
 
 fn null(tempi: &mut u64) -> Result<VarIndex, String> {
