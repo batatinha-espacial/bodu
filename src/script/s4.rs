@@ -1,6 +1,6 @@
 use crate::{script::s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, VarIndex}};
 
-// TODO: Decorator, Pipe, OrThat, OperatorFn, MultiLet, Null, PipeShorthand
+// TODO: Decorator, Pipe, OrThat, OperatorFn, MultiLet, PipeShorthand
 
 pub fn s4(input: Vec<S3T>) -> Result<Vec<Instruction>, String> {
     let mut tempi: u64 = 1; // outi = 0
@@ -72,6 +72,7 @@ fn expr(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Property(a, b) => prop(a, b, res, tempi, labeli, outi, outli),
         S3T::Tuple(a) => tuple(a, res, tempi, labeli, outi, outli),
         S3T::FnCall(a, b) => fn_call(a, b, res, tempi, labeli, outi, outli),
+        S3T::Null => null(tempi),
         _ => Err("invalid expression".to_string()),
     }
 }
@@ -597,3 +598,8 @@ fn fn_call(v: Box<S3T>, args: Vec<S3T>, res: &mut Vec<Instruction>, tempi: &mut 
     Ok(VarIndex::Temp(vi))
 }
 
+fn null(tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    Ok(VarIndex::Temp(r))
+}
