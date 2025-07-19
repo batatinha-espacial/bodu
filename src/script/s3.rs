@@ -1,5 +1,7 @@
 use crate::script::s2::S2T;
 
+pub use crate::vm::Operator;
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum S3T {
     Identifier(String),
@@ -49,6 +51,8 @@ pub enum S3T {
     OrThat(Box<S3T>, Box<S3T>), // expr ?? expr
     OperatorFn(Operator), // wrap the operator in brackets
     MultiLet(Vec<String>), // let (v1, v2, v3, ...)
+    Null,
+    PipeShorthand, // $
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -63,34 +67,12 @@ pub enum LoopType {
     Until,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum Operator {
-    Plus, // +
-    Minus, // -
-    Times, // *
-    Divide, // /
-    Modulus, // %
-    OrThat, // ??
-    Ternary, // ?:
-    EqualTo, // ==
-    Not, // !
-    NotEqualTo, // !=
-    Less, // <
-    LessOrEqual, // <=
-    Greater, // >
-    GreaterOrEqual, // >=
-    And, // &
-    Or, // |
-    Xor, // ^
-    Property, // . []
-    Tuple, // ,
-    Decorator, // @
-    Pipe, // |>
-}
-
 pub fn s3(input: Vec<S2T>) -> Result<Vec<S3T>, String> {
     let mut i: usize = 0;
     let res = stat_list(&input, &mut i);
+    if i < input.len() - 1 {
+        return Err("couldn't parse".to_string());
+    }
     res.ok_or("couldn't parse".to_string()).map(|v| v.0)
 }
 
@@ -119,6 +101,14 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         Some(S2T::False) => {
             *i += 1;
             Some((S3T::Boolean(false), 1))
+        },
+        Some(S2T::Null) => {
+            *i += 1;
+            Some((S3T::Null, 1))
+        },
+        Some(S2T::PipeShorthand) => {
+            *i += 1;
+            Some((S3T::PipeShorthand, 1))
         },
         Some(S2T::PlusFn) => {
             *i += 1;
@@ -196,11 +186,7 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
             *i += 1;
             Some((S3T::OperatorFn(Operator::Tuple), 1))
         },
-        Some(S2T::DecoratorFn) => {
-            *i += 1;
-            Some((S3T::OperatorFn(Operator::Decorator), 1))
-        },
-        Some(S2T::Pipe) => {
+        Some(S2T::PipeFn) => {
             *i += 1;
             Some((S3T::OperatorFn(Operator::Pipe), 1))
         },
@@ -295,12 +281,18 @@ fn field(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
 fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
     let mut res = Vec::new();
     let mut n = 0;
-    match expr(input, i) {
+    match stat_expr(input, i) {
         Some((v, nn)) => {
             n += nn;
             res.push(v);
         },
-        _ => return None,
+        _ => match expr(input, i) {
+            Some((v, nn)) => {
+                n += nn;
+                res.push(v);
+            },
+            _ => return None,
+        },
     }
     loop {
         match input.get(*i) {
@@ -310,7 +302,7 @@ fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
             },
             _ => break,
         };
-        let t = match expr(input, i) {
+        let t = match stat_expr(input, i) {
             Some((v, nn)) => {
                 n += nn;
                 res.push(v);
@@ -323,7 +315,7 @@ fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
         };
         let t = match t {
             Some(_) => Some(()),
-            _ => match stat_expr(input, i) {
+            _ => match expr(input, i) {
                 Some((v, nn)) => {
                     n += nn;
                     res.push(v);
@@ -1039,19 +1031,21 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                 n += 1;
                                 *i += 1;
                                 let t = match stat_expr(input, i) {
-                                    Some((v, nn)) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n)),
+                                    Some((v, nn)) => {
+                                        n += nn;
+                                        Some((S3T::Let(s.clone(), Some(Box::new(v))), n))
+                                    },
                                     _ => None,
                                 };
                                 let t = match t {
                                     Some(t) => Some(t),
                                     _ => match expr(input, i) {
                                         Some((v, nn)) => {
-                                            *i += 1;
+                                            n += nn;
                                             match input.get(*i) {
                                                 Some(S2T::Semicolon) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n + 1)),
                                                 _ => {
                                                     *i -= nn;
-                                                    *i -= 1;
                                                     None
                                                 },
                                             }
@@ -1059,7 +1053,13 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                         _ => None,
                                     },
                                 };
-                                t
+                                match t {
+                                    Some(t) => Some(t),
+                                    None => {
+                                        *i -= n;
+                                        None
+                                    },
+                                }
                             },
                             _ => {
                                 *i -= n;
@@ -1590,6 +1590,8 @@ fn stat_expr(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                     *i += 1;
                     match input.get(*i) {
                         Some(S2T::OpenBrace) => {
+                            n += 1;
+                            *i += 1;
                             let stats = match stat_list(input, i) {
                                 Some((v, nn)) => {
                                     n += nn;
@@ -1985,6 +1987,8 @@ fn if_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<(ConditionType, Box<S
                 return None;
             },
         }
+        *i += 1;
+        n += 1;
         res.push((op, Box::new(cond), stats));
     }
     loop {
@@ -2031,6 +2035,8 @@ fn if_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<(ConditionType, Box<S
                 return None;
             },
         }
+        *i += 1;
+        n += 1;
         res.push((op, Box::new(cond), stats));
     }
     Some((res, n))

@@ -86,9 +86,9 @@ pub enum S2T {
     XorFn, // [^]
     PropertyFn, // [.]
     TupleFn, // [,]
-    DecoratorFn, // [@]
     PipeFn, // [|>]
     Null, // null
+    PipeShorthand, // $
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -335,6 +335,7 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordGoto => res.push(S2T::Goto),
             S1T::KeywordFn => res.push(S2T::Fn),
             S1T::KeywordNull => res.push(S2T::Null),
+            S1T::Dollar => res.push(S2T::PipeShorthand),
         }
     }
     let s2 = res;
@@ -364,7 +365,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                         S2T::Xor => true,
                         S2T::Dot => true,
                         S2T::Comma => true,
-                        S2T::At => true,
                         S2T::Pipe => true,
                         _ => false,
                     }
@@ -467,10 +467,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                             opfn_helper(&mut iterr, S2T::TupleFn, S2T::Comma, &mut res);
                             continue;
                         },
-                        S2T::At => {
-                            opfn_helper(&mut iterr, S2T::DecoratorFn, S2T::At, &mut res);
-                            continue;
-                        },
                         S2T::Pipe => {
                             opfn_helper(&mut iterr, S2T::PipeFn, S2T::Pipe, &mut res);
                             continue;
@@ -501,67 +497,12 @@ fn opfn_helper(iterr: &mut Peekable<Iter<'_, S2T>>, tok: S2T, tokfail: S2T, res:
 }
 
 fn parse_int(s: String, base: Base) -> i64 {
-    let mut iterr = s.chars();
-    let mut r = 0;
-    let b: i64 = match base {
-        Base::B10 => 10,
-        Base::B2 => 2,
-        Base::B8 => 8,
-        Base::B16 => 16,
-    };
-    while let Some(ch) = iterr.next() {
-        r = r * b + match base {
-            Base::B10 => match ch {
-                '0' => 0,
-                '1' => 1,
-                '2' => 2,
-                '3' => 3,
-                '4' => 4,
-                '5' => 5,
-                '6' => 6,
-                '7' => 7,
-                '8' => 8,
-                '9' => 9,
-                _ => 0, // should never happen
-            },
-            Base::B2 => match ch {
-                '0' => 0,
-                '1' => 1,
-                _ => 0, // should never happen
-            },
-            Base::B8 => match ch {
-                '0' => 0,
-                '1' => 1,
-                '2' => 2,
-                '3' => 3,
-                '4' => 4,
-                '5' => 5,
-                '6' => 6,
-                '7' => 7,
-                _ => 0, // should never happen
-            },
-            Base::B16 => match ch {
-                '0' => 0,
-                '1' => 1,
-                '2' => 2,
-                '3' => 3,
-                '4' => 4,
-                '5' => 5,
-                '6' => 6,
-                '7' => 7,
-                '8' => 8,
-                '9' => 9,
-                'a' => 10,
-                'b' => 11,
-                'c' => 12,
-                'd' => 13,
-                'e' => 14,
-                'f' => 15,
-                _ => 0, // should never happen
-            },
-        };
+    match base {
+        Base::B10 => i64::from_str_radix(&s, 10).unwrap(),
+        Base::B2 => i64::from_str_radix(&s, 2).unwrap(),
+        Base::B8 => i64::from_str_radix(&s, 8).unwrap(),
+        Base::B16 => i64::from_str_radix(&s, 16).unwrap(),
     }
-    r
 }
 
 fn parse_float(s: String, base: Base) -> f64 {

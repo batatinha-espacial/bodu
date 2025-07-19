@@ -1,6 +1,74 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::vm::{make_container, op::{make_object_base, make_tuple, set_base, to_number_base}, Container, Function, Gi, StateContainer, Value};
+use tokio::sync::Mutex;
+
+use crate::vm::{make_container, make_err, op::{make_object, make_object_base, make_tuple, set_base, to_number_base, to_string_base}, Container, Function, Gi, StateContainer, Value};
+
+// Function pointer wrappers for array operations
+fn array_get_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        get(state, args, gi).await
+    })
+}
+
+fn array_set_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        set(state, args, gi).await
+    })
+}
+
+fn array_pop_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        pop(state, args, gi).await
+    })
+}
+
+fn array_push_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        push(state, args, gi).await
+    })
+}
+
+fn array_iter_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        iter(state, args, gi).await
+    })
+}
+
+fn array_len_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        len(state, args, gi).await
+    })
+}
+
+fn meta_add_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        meta_add(state, args, gi).await
+    })
+}
+
+fn meta_to_string_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        meta_to_string(state, args, gi).await
+    })
+}
+
+fn iter_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let i = gi(0).unwrap();
+        let i = (match i.lock().await.clone() {
+            Value::Object(i) => Some(i),
+            _ => None,
+        }).unwrap();
+        let i = i.externals.get(&0).unwrap().clone();
+        let mut i = i.lock().await;
+        let i = i.downcast_mut::<<Vec<Container> as IntoIterator>::IntoIter>().unwrap();
+        Ok(match i.next() {
+            None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
+            Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), i.clone()]),
+        })
+    })
+}
 
 macro_rules! helper1 {
     ($state:expr, $fcall:expr, $o:expr, $prop:expr) => {{
@@ -10,41 +78,79 @@ macro_rules! helper1 {
             state: $state.clone(),
         };
         fn_.internals.insert(0, $o.clone());
-        set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_)))?;
+        set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_))).await?;
     }};
 }
 
-pub fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
-    new_with_vec(state, Vec::new())
+macro_rules! helper2 {
+    ($state:expr, $fcall:expr, $o:expr, $prop:expr) => {{
+        let fn_ = Function {
+            internals: HashMap::new(),
+            call: $fcall,
+            state: $state.clone(),
+        };
+        set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_))).await?;
+    }};
 }
 
-pub fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Container, Container> {
+pub async fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    new_with_vec(state, Vec::new()).await
+}
+
+pub async fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Container, Container> {
     let mut o = make_object_base();
+    o.internals.insert(u64::MAX, make_container(Value::String("array".to_string())));
     o.externals.insert(0, Arc::new(Mutex::new(Box::new(data.clone()))));
+    o.metaobj = make_object();
+    helper2!(state, meta_add_wrapper, o.metaobj, "add");
+    helper2!(state, meta_to_string_wrapper, o.metaobj, "to_string");
     let o = make_container(Value::Object(o));
 
-    helper1!(state, get, o, "get");
-    helper1!(state, set, o, "set");
-    helper1!(state, pop, o, "pop");
-    helper1!(state, push, o, "push");
-    helper1!(state, iter, o, "iter");
+    helper1!(state, array_get_wrapper, o, "get");
+    helper1!(state, array_set_wrapper, o, "set");
+    helper1!(state, array_pop_wrapper, o, "pop");
+    helper1!(state, array_push_wrapper, o, "push");
+    helper1!(state, array_iter_wrapper, o, "iter");
+    helper1!(state, array_len_wrapper, o, "len");
 
     Ok(o)
 }
 
-fn get(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+pub async fn is_array(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("array.is_array requires 1 argument"));
+    }
+    let o = args[0].clone();
+    let o = o.lock().await.clone();
+    let o = match o {
+        Value::Object(o) => o,
+        _ => return Ok(make_container(Value::Boolean(false))),
+    };
+    let o = match o.internals.get(&u64::MAX) {
+        None => return Ok(make_container(Value::Boolean(false))),
+        Some(v) => v.clone(),
+    };
+    let o = o.lock().await.clone();
+    let o = match o {
+        Value::String(s) => s.clone(),
+        _ => return Ok(make_container(Value::Boolean(false))),
+    };
+    Ok(make_container(Value::Boolean(o == "array")))
+}
+
+async fn get(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
     if args.len() == 0 {
         return Err(make_container(Value::String("array.get requires 1 argument".to_string())))
     }
-    let mut i = to_number_base(state.clone(), args[0].clone())?;
+    let mut i = to_number_base(state.clone(), args[0].clone()).await?;
     if i < -(o.len() as i64) || i >= o.len() as i64 {
         return Ok(make_container(Value::Null))
     }
@@ -54,19 +160,19 @@ fn get(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container,
     Ok(o[i as usize].clone())
 }
 
-fn set(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn set(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
     if args.len() < 2 {
         return Err(make_container(Value::String("array.set requires 2 argument".to_string())))
     }
-    let mut i = to_number_base(state.clone(), args[0].clone())?;
+    let mut i = to_number_base(state.clone(), args[0].clone()).await?;
     if i < -(o.len() as i64) || i >= o.len() as i64 {
         return Ok(make_container(Value::Null))
     }
@@ -77,14 +183,14 @@ fn set(state: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container,
     Ok(make_container(Value::Null))
 }
 
-fn pop(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn pop(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
     let v = o.pop();
     Ok(match v {
@@ -93,27 +199,27 @@ fn pop(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Contai
     })
 }
 
-fn push(_: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn push(_: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
     o.extend(args.iter().map(|v| v.clone()));
     Ok(make_container(Value::Number(o.len() as i64)))
 }
 
-fn iter(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+async fn iter(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
     let o = gi(0).unwrap();
-    let o = (match o.lock().unwrap().clone() {
+    let o = (match o.lock().await.clone() {
         Value::Object(o) => Some(o),
         _ => None,
     }).unwrap();
     let o = o.externals.get(&0).unwrap().clone();
-    let mut o = o.lock().unwrap();
+    let mut o = o.lock().await;
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
     let f = {
         let mut internals = HashMap::new();
@@ -123,22 +229,99 @@ fn iter(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, C
         internals.insert(0, oo);
         Function {
             internals,
-            call: |_, _, gi| {
-                let i = gi(0).unwrap();
-                let i = (match i.lock().unwrap().clone() {
-                    Value::Object(i) => Some(i),
-                    _ => None,
-                }).unwrap();
-                let i = i.externals.get(&0).unwrap().clone();
-                let mut i = i.lock().unwrap();
-                let i = i.downcast_mut::<<Vec<Container> as IntoIterator>::IntoIter>().unwrap();
-                Ok(match i.next() {
-                    None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
-                    Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), i.clone()]),
-                })
-            },
+            call: iter_next_wrapper,
             state: state.clone(),
         }
     };
     Ok(make_container(Value::Function(f)))
+}
+
+async fn meta_add(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("array's metaobj add requires 2 arguments"));
+    }
+    let a = {
+        let o = args[0].clone();
+        let o = match match o.lock().await.clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let mut o = o.lock().await;
+        let o = match o.downcast_mut::<Vec<Container>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        o
+    };
+    let b = {
+        let o = args[1].clone();
+        let o = match match o.lock().await.clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        let mut o = o.lock().await;
+        let o = match o.downcast_mut::<Vec<Container>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj add requires 2 arrays")),
+        };
+        o
+    };
+    new_with_vec(state.clone(), a.into_iter().chain(b.into_iter()).collect()).await
+}
+
+async fn meta_to_string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("array's metaobj to_string requires 1 argument"));
+    }
+    let a = {
+        let o = args[0].clone();
+        let o = match match o.lock().await.clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        } {
+            Some(o) => o,
+            _ => return Err(make_err("array's metaobj to_string requires 1 array")),
+        };
+        let o = match o.externals.get(&0) {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj to_string requires 1 array")),
+        };
+        let mut o = o.lock().await;
+        let o = match o.downcast_mut::<Vec<Container>>() {
+            Some(o) => o.clone(),
+            _ => return Err(make_err("array's metaobj to_string requires 1 array")),
+        };
+        o
+    };
+    let mut vec_ = Vec::new();
+    for i in a {
+        vec_.push(to_string_base(state.clone(), i).await?);
+    }
+    Ok(make_container(Value::String("[".to_string()+&vec_.join(", ")+&"]")))
+}
+
+async fn len(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<Container>>().unwrap();
+    Ok(make_container(Value::Number(o.len() as i64)))
 }

@@ -1,9 +1,9 @@
-use std::{any::Any, collections::HashMap, sync::{Arc, Mutex}};
+use std::{any::Any, collections::HashMap, pin::Pin, sync::Arc};
 
-use tokio::{runtime::Runtime, task::JoinHandle};
+use tokio::{sync::Mutex, task::JoinHandle};
 
-// standard operations that bodu code can do
-pub mod op;
+pub mod op; // standard operations that bodu code can do
+pub mod opfn;
 
 // bodu values. those are often wrapped in Arc<Mutex<T>>s.
 #[derive(Clone, Debug)]
@@ -36,13 +36,13 @@ pub enum ObjectProp {
 }
 
 // gets the function's internal values
-pub type Gi = Arc<dyn Fn(u64) -> Option<Container>>;
+pub type Gi = Arc<dyn Fn(u64) -> Option<Container> + Sync + Send>;
 
 // functions
 #[derive(Clone, Debug)]
 pub struct Function {
     pub internals: HashMap<u64, Container>, // internal values used by the function
-    pub call: fn(StateContainer, Vec<Container>, Gi) -> Result<Container, Container>, // the actual function
+    pub call: fn(StateContainer, Vec<Container>, Gi) -> Pin<Box<dyn Future<Output = Result<Container, Container>> + Send>>, // the actual function
     pub state: StateContainer, // the state it runs on
 }
 
@@ -55,7 +55,7 @@ pub fn make_container(v: Value) -> Container {
 }
 
 // the state: it contains the scope of a function and it is an execution context (kinda)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct State {
     pub scope: Container, // the scope
     pub parent: Option<StateContainer>, // parent state
@@ -66,11 +66,9 @@ pub struct State {
 
 #[derive(Debug)]
 pub struct GlobalData {
-    pub threads: Arc<Mutex<HashMap<u64, JoinHandle<Result<Container, Container>>>>>,
+    pub threads: HashMap<u64, JoinHandle<Result<Container, Container>>>,
     pub threadid: u64,
-    pub threadsvec: Vec<u64>,
     pub exitcode: u8,
-    pub runtime: Arc<Mutex<Runtime>>,
 }
 
 // Container but for States
@@ -118,6 +116,10 @@ pub enum Instruction {
     And(VarIndex, VarIndex, VarIndex), // result, op1, op2
     Or(VarIndex, VarIndex, VarIndex), // result, op1, op2
     Xor(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    GetPipeShorthand(VarIndex), // result
+    SetPipeShorthand(VarIndex), // op
+    OrThat(VarIndex, VarIndex, VarIndex), // result, op1, op2
+    OperatorFn(VarIndex, Operator), // result, opfn
 }
 
 #[derive(Clone, Debug)]
@@ -134,9 +136,34 @@ pub enum Label {
 }
 
 // type for object externals
-pub type SharedAny = Arc<Mutex<Box<dyn Any + Send>>>;
+pub type SharedAny = Arc<Mutex<Box<dyn Any + Send + Sync>>>;
 
 // makes an error, could be a macro
 pub fn make_err(v: &str) -> Container {
     make_container(Value::String(v.to_string()))
+}
+
+// used for operator functions
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Operator {
+    Plus, // +
+    Minus, // -
+    Times, // *
+    Divide, // /
+    Modulus, // %
+    OrThat, // ??
+    Ternary, // ?:
+    EqualTo, // ==
+    Not, // !
+    NotEqualTo, // !=
+    Less, // <
+    LessOrEqual, // <=
+    Greater, // >
+    GreaterOrEqual, // >=
+    And, // &
+    Or, // |
+    Xor, // ^
+    Property, // .
+    Tuple, // ,
+    Pipe, // |>
 }
