@@ -2,9 +2,14 @@ use crate::vm::{make_err, op::{add, and, call, divide, eql, ge, get, gt, le, lt,
 
 pub async fn plus(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[+] requires 2 arguments"));
+        return Err(make_err("[+] requires at least 2 arguments"));
     }
-    add(state, args[0].clone(), args[1].clone()).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = add(state.clone(), res, i).await?;
+    }
+    Ok(res)
 }
 
 pub async fn minus(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -20,9 +25,14 @@ pub async fn minus(state: StateContainer, args: Vec<Container>, _: Gi) -> Result
 
 pub async fn times(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[*] requires 2 arguments"));
+        return Err(make_err("[*] requires at least 2 arguments"));
     }
-    multiply(state, args[0].clone(), args[1].clone()).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = multiply(state.clone(), res, i).await?;
+    }
+    Ok(res)
 }
 
 pub async fn divide_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -41,9 +51,14 @@ pub async fn modulus(state: StateContainer, args: Vec<Container>, _: Gi) -> Resu
 
 pub async fn orthat_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[??] requires 2 arguments"));
+        return Err(make_err("[??] requires at least 2 arguments"));
     }
-    orthat(state, args[0].clone(), args[1].clone()).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = orthat(state.clone(), res, i).await?;
+    }
+    Ok(res)
 }
 
 pub async fn ternary(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -108,16 +123,26 @@ pub async fn greaterorequal(state: StateContainer, args: Vec<Container>, _: Gi) 
 
 pub async fn and_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[&] requires 2 arguments"));
+        return Err(make_err("[&] requires at least 2 arguments"));
     }
-    and(state, args[0].clone(), args[1].clone()).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = and(state.clone(), res, i).await?;
+    }
+    Ok(res)
 }
 
 pub async fn or_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[|] requires 2 arguments"));
+        return Err(make_err("[|] requires at least 2 arguments"));
     }
-    or(state, args[0].clone(), args[1].clone()).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = or(state.clone(), res, i).await?;
+    }
+    Ok(res)
 }
 
 pub async fn xor_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -129,9 +154,14 @@ pub async fn xor_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
 
 pub async fn property(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[.] requires 2 arguments"));
+        return Err(make_err("[.] requires at least 2 arguments"));
     }
-    get(state, args[0].clone(), args[1].clone()).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = get(state.clone(), res, i).await?;
+    }
+    Ok(res)
 }
 
 pub async fn tuple(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -143,7 +173,12 @@ pub async fn tuple(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Con
 
 pub async fn pipe(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
-        return Err(make_err("[|>] requires 2 arguments"));
+        return Err(make_err("[|>] requires at least 2 arguments"));
     }
-    call(state, args[1].clone(), vec![args[0].clone()]).await
+    let mut args = args.clone();
+    let mut res = args.remove(0);
+    for i in args {
+        res = call(state.clone(), res, vec![i]).await?;
+    }
+    Ok(res)
 }
