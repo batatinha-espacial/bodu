@@ -740,10 +740,12 @@ fn includes_fnshorthand(v: Box<S3T>) -> bool {
 
 fn pipe(left: Box<S3T>, right: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, outi: u64, outli: u64) -> Result<VarIndex, String> {
     if includes_fnshorthand(right.clone()) {
+        let i = VarIndex::Temp(*tempi);
+        *tempi += 1;
+        res.push(Instruction::GetPipeShorthand(i.clone()));
         let left = expr(*left, res, tempi, labeli, outi, outli)?;
         res.push(Instruction::SetPipeShorthand(left));
         let right = expr(*right, res, tempi, labeli, outi, outli)?;
-        let i = null(tempi)?;
         res.push(Instruction::SetPipeShorthand(i));
         Ok(right)
     } else {
