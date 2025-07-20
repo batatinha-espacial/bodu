@@ -202,7 +202,7 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                             *i += 1;
                             n += 1;
                             let v = match v.len() {
-                                1 => v[1].clone(),
+                                1 => v[0].clone(),
                                 _ => S3T::Tuple(v),
                             };
                             Some((v, n))
@@ -309,7 +309,6 @@ fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
                 Some(())
             },
             _ => {
-                *i -= n;
                 None
             },
         };
@@ -322,7 +321,6 @@ fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
                     Some(())
                 },
                 _ => {
-                    *i -= n;
                     None
                 },
             },
@@ -330,6 +328,7 @@ fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
         match t {
             Some(_) => {},
             _ => {
+                *i -= n;
                 return None;
             },
         }
