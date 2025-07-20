@@ -69,6 +69,9 @@ pub enum LoopType {
 
 pub fn s3(input: Vec<S2T>) -> Result<Vec<S3T>, String> {
     let mut i: usize = 0;
+    if input.len() == 0 {
+        return Ok(Vec::new());
+    }
     let res = stat_list(&input, &mut i);
     if i < input.len() - 1 {
         return Err("couldn't parse".to_string());
@@ -866,7 +869,7 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                     },
                     _ => {
                         *i -= n;
-                        return None;
+                        None
                     },
                 }
             },
@@ -982,7 +985,11 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                             *i += 1;
                             n += 1;
                             match input.get(*i) {
-                                Some(S2T::Semicolon) => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Plus(Box::new(left.clone()), Box::new(S3T::Number(1))))), n)),
+                                Some(S2T::Semicolon) => {
+                                    n += 1;
+                                    *i += 1;
+                                    Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Plus(Box::new(left.clone()), Box::new(S3T::Number(1))))), n))
+                                },
                                 _ => {
                                     *i -= n;
                                     None
@@ -993,7 +1000,11 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                             *i += 1;
                             n += 1;
                             match input.get(*i) {
-                                Some(S2T::Semicolon) => Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Minus(Box::new(left.clone()), Box::new(S3T::Number(1))))), n)),
+                                Some(S2T::Semicolon) => {
+                                    n += 1;
+                                    *i += 1;
+                                    Some((S3T::Assign(Box::new(left.clone()), Box::new(S3T::Minus(Box::new(left.clone()), Box::new(S3T::Number(1))))), n))
+                                },
                                 _ => {
                                     *i -= n;
                                     None

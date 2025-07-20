@@ -25,7 +25,7 @@ macro_rules! make_function {
 }
 
 macro_rules! make_fn {
-    ($state:expr, $fcall:expr) => {{
+    ($state:expr, $fcall:expr) => {
         make_container(Value::Function(Function {
             internals: HashMap::new(),
             call: |state, args, gi| {
@@ -35,7 +35,7 @@ macro_rules! make_fn {
             },
             state: $state.clone(),
         }))
-    }};
+    };
 }
 
 pub async fn new_global_state(debug: bool) -> StateContainer {
