@@ -129,7 +129,11 @@ pub async fn init_global_state(state: StateContainer) {
         make_function_true!(state, iter_object, "any", iter::any);
         make_function_true!(state, iter_object, "chain", iter::chain);
         make_function_true!(state, iter_object, "collect", iter::collect);
+        make_function_true!(state, iter_object, "count", iter::count);
         make_function_true!(state, iter_object, "cycle", iter::cycle);
+        make_function_true!(state, iter_object, "enumerate", iter::enumerate);
+        make_function_true!(state, iter_object, "filter", iter::filter);
+        make_function_true!(state, iter_object, "map", iter::map);
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).await.unwrap();
     }
     {
