@@ -1,6 +1,6 @@
 use std::{iter::Peekable, slice::Iter};
 
-use crate::script::s1::{Base, S1T};
+use crate::s1::{Base, S1T};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum S2T {

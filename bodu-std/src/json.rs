@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{libstd::array, vm::{make_container, make_err, op::{call, make_object_base}, Container, Gi, ObjectProp, StateContainer, Value}};
+use crate::{array, vm::{make_container, make_err, op::{call, make_object_base}, Container, Gi, ObjectProp, StateContainer, Value}};
 
 pub async fn encode(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {

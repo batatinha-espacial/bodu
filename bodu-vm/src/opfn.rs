@@ -1,4 +1,4 @@
-use crate::vm::{make_err, op::{add, and, call, divide, eql, ge, get, gt, le, lt, make_tuple, multiply, negate, neql, not, or, orthat, remainder, subtract, to_boolean_base, xor}, Container, Gi, StateContainer};
+use crate::{make_err, op::{add, and, call, divide, eql, ge, get, gt, le, lt, make_tuple, multiply, negate, neql, not, or, orthat, remainder, subtract, to_boolean_base, xor}, Container, Gi, StateContainer};
 
 pub async fn plus(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {

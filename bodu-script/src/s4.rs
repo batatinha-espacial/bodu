@@ -1,4 +1,4 @@
-use crate::{script::s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, Operator, VarIndex}};
+use crate::{s3::{ConditionType, LoopType, S3T}, vm::{Instruction, Label, Operator, VarIndex}};
 
 pub fn s4(input: Vec<S3T>) -> Result<Vec<Instruction>, String> {
     let mut tempi: u64 = 1; // outi = 0

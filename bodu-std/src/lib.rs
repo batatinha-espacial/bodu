@@ -1,3 +1,5 @@
+pub use bodu_vm as vm;
+
 use std::{collections::HashMap, io::Write, sync::Arc};
 
 use base64::Engine;

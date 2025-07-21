@@ -1,4 +1,4 @@
-use crate::script::s2::S2T;
+use crate::s2::S2T;
 
 pub use crate::vm::Operator;
 

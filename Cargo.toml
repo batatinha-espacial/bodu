@@ -4,8 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-base64 = "0.22.1"
 clap = "4.5.41"
 rustyline = "16.0.0"
-serde_json = "1.0.140"
 tokio = { version = "1.46.1", features = ["full"] }
+bodu-vm = { path = "./bodu-vm" }
+bodu-script = { path = "./bodu-script" }
+bodu-std = { path = "./bodu-std" }
+
+[features]
+default = ["extensions"]
+extensions = []

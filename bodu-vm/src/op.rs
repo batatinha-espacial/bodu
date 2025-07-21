@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, pin::Pin};
 
 use tokio::sync::Mutex;
 
-use crate::vm::{make_container, make_err, opfn, Container, Function, Gi, Instruction, Label, Object, ObjectProp, Operator, State, StateContainer, Value, VarIndex};
+use crate::{make_container, make_err, opfn, Container, Function, Gi, Instruction, Label, Object, ObjectProp, Operator, State, StateContainer, Value, VarIndex};
 
 // TODO: add comments
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{libstd::array::{self, new_with_vec}, vm::{make_container, make_err, op::{call, call_prop, detuple, make_object_base, make_tuple, to_boolean_base}, Container, Function, Gi, StateContainer, Value}};
+use crate::{array::{self, new_with_vec}, vm::{make_container, make_err, op::{call, call_prop, detuple, make_object_base, make_tuple, to_boolean_base}, Container, Function, Gi, StateContainer, Value}};
 
 pub async fn collect(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
