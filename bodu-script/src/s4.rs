@@ -686,10 +686,11 @@ fn pipe(left: Box<S3T>, right: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut
         *tempi += 1;
         res.push(Instruction::GetPipeShorthand(i.clone()));
         let left = expr(*left, res, tempi, labeli, outi, outli, conti, contli, breaki, breakli)?;
-        res.push(Instruction::SetPipeShorthand(left));
         let mut vec_ = Vec::new();
+        vec_.push(Instruction::SetPipeShorthand(left));
         let right = expr(*right, &mut vec_, tempi, labeli, outi, outli, conti, contli, breaki, breakli)?;
         vec_.push(Instruction::Defer(vec![Instruction::SetPipeShorthand(i)]));
+        res.push(Instruction::Block(vec_));
         Ok(right)
     } else {
         let left = expr(*left, res, tempi, labeli, outi, outli, conti, contli, breaki, breakli)?;
