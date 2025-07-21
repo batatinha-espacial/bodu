@@ -676,6 +676,13 @@ fn includes_fnshorthand(v: Box<S3T>) -> bool {
         S3T::Pipe(v, _) => includes_fnshorthand(v),
         S3T::OrThat(v1, v2) => includes_fnshorthand(v1) || includes_fnshorthand(v2),
         S3T::PipeShorthand => true,
+        S3T::Loop(v1, _, _, _, _, _) => {
+            let mut b = false;
+            for i in v1 {
+                b = b || includes_fnshorthand(Box::new(i));
+            }
+            b
+        },
         _ => false,
     }
 }
