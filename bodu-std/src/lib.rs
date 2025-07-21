@@ -1,4 +1,4 @@
-use bodu_vm::op::make_function;
+use bodu_vm::op::{get_base, make_function, new_state, to_boolean_base};
 pub use bodu_vm as vm;
 
 use std::{collections::HashMap, io::Write, sync::Arc};
@@ -662,17 +662,53 @@ async fn type_(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Contain
     })))
 }
 
+#[derive(Clone, Copy)]
+enum Debug {
+    Inherit,
+    Debug,
+    Release,
+}
+
 async fn load(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
         return Err(make_err("load requires 1 argument"));
     }
     let code = to_string_base(state.clone(), args[0].clone()).await?;
     let global = state.as_ref().lock().await.global.clone().unwrap().clone();
+    let debug = match args.get(1) {
+        None => Debug::Inherit,
+        Some(v) => {
+            let v = get_base(state.clone(), v.clone(), "dbg".to_string()).await?;
+            let v = to_boolean_base(state.clone(), v).await?;
+            if v {
+                Debug::Debug
+            } else {
+                Debug::Release
+            }
+        },
+    };
     let code = bodu_script::s1::s1(code).map_err(|s| make_err(&format!("parsing error inside load (S1): {}", s)))?;
     let code = bodu_script::s2::s2(code).map_err(|s| make_err(&format!("parsing error inside load (S2): {}", s)))?;
     let code = bodu_script::s3::s3(code).map_err(|s| make_err(&format!("parsing error inside load (S3): {}", s)))?;
     let code = bodu_script::s4::s4(code).map_err(|s| make_err(&format!("parsing error inside load (S4): {}", s)))?;
-    let f = make_function(global.clone(), code, None).await?;
+    let s = match debug {
+        Debug::Inherit => None,
+        Debug::Release => {
+            let s = new_state(state.clone()).await;
+            {
+                s.lock().await.debug = false;
+            }
+            Some(s)
+        },
+        Debug::Debug => {
+            let s = new_state(state.clone()).await;
+            {
+                s.lock().await.debug = true;
+            }
+            Some(s)
+        },
+    };
+    let f = make_function(global.clone(), code, s).await?;
     Ok(f)
 }
 
