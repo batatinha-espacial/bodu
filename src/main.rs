@@ -34,12 +34,26 @@ async fn main() {
     }
 }
 
+static D: bool = false; // change this if you need to debug the parser
+
 async fn interpret(file: String) {
     let contents = std::fs::read_to_string(file).unwrap();
     let contents = s1(contents).unwrap();
+    if D {
+        println!("S1: {:#?}", contents);
+    }
     let contents = s2(contents).unwrap();
+    if D {
+        println!("S2: {:#?}", contents);
+    }
     let contents = s3(contents).unwrap();
+    if D {
+        println!("S3: {:#?}", contents);
+    }
     let instrs = s4(contents).unwrap();
+    if D {
+        println!("S4: {:#?}", instrs);
+    }
     let state = new_global_state(false).await;
     init_global_state(state.clone()).await;
     let f = make_function(state.clone(), instrs, None).await.unwrap();
@@ -52,7 +66,6 @@ async fn repl() {
     init_global_state(state.clone()).await;
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();
-    let d = false; // change this if you need to debug the parser
     loop {
         let line = rl.readline(">> ");
         match line {
@@ -65,7 +78,7 @@ async fn repl() {
                         continue;
                     },
                 };
-                if d {
+                if D {
                     println!("S1: {:#?}", line);
                 }
                 let line = match s2(line) {
@@ -75,7 +88,7 @@ async fn repl() {
                         continue;
                     },
                 };
-                if d {
+                if D {
                     println!("S2: {:#?}", line);
                 }
                 let line = match s3(line) {
@@ -85,7 +98,7 @@ async fn repl() {
                         continue;
                     },
                 };
-                if d {
+                if D {
                     println!("S3: {:#?}", line);
                 }
                 let line = match s4(line) {
@@ -95,7 +108,7 @@ async fn repl() {
                         continue;
                     },
                 };
-                if d {
+                if D {
                     println!("S4: {:#?}", line);
                 }
                 let f = match make_function(state.clone(), line, Some(s.clone())).await {

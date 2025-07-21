@@ -1042,8 +1042,16 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                 *i += 1;
                                 let t = match stat_expr(input, i) {
                                     Some((v, nn)) => {
-                                        n += nn;
-                                        Some((S3T::Let(s.clone(), Some(Box::new(v))), n))
+                                        match input.get(*i) {
+                                            Some(S2T::Semicolon) => {
+                                                *i += 1;
+                                                Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n + 1))
+                                            },
+                                            _ => {
+                                                *i -= nn;
+                                                None
+                                            },
+                                        }
                                     },
                                     _ => None,
                                 };
@@ -1051,9 +1059,11 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                                     Some(t) => Some(t),
                                     _ => match expr(input, i) {
                                         Some((v, nn)) => {
-                                            n += nn;
                                             match input.get(*i) {
-                                                Some(S2T::Semicolon) => Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n + 1)),
+                                                Some(S2T::Semicolon) => {
+                                                    *i += 1;
+                                                    Some((S3T::Let(s.clone(), Some(Box::new(v))), nn + n + 1))
+                                                },
                                                 _ => {
                                                     *i -= nn;
                                                     None
