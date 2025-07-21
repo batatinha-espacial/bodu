@@ -1,5 +1,5 @@
 use bodu::{libstd::{init_global_state, new_global_state}, script::{s1::s1, s2::s2, s3::s3, s4::s4}, vm::op::{call, make_function, new_state, to_string_base}};
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use rustyline::DefaultEditor;
 
 #[tokio::main]
@@ -7,6 +7,14 @@ async fn main() {
     let local = tokio::task::LocalSet::new();
     local.enter();
     let mut cmd = Command::new("bodu")
+        .arg(
+            Arg::new("debug")
+                .short('D')
+                .long("debug")
+                .help("run in debug mode")
+                .action(ArgAction::SetTrue)
+                .global(true)
+        )
         .subcommand(
             Command::new("run")
                 .arg(
@@ -24,11 +32,11 @@ async fn main() {
     let matches = cmd.clone().get_matches();
     if let Some(_) = matches.subcommand_matches("version") {
         println!("Bodu 0.1.0");
-    } else if let Some(_) = matches.subcommand_matches("repl") {
-        repl().await;
+    } else if let Some(matches) = matches.subcommand_matches("repl") {
+        repl(matches.get_flag("debug")).await;
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let file = matches.get_one::<String>("file").unwrap();
-        interpret(file.clone()).await;
+        interpret(file.clone(), matches.get_flag("debug")).await;
     } else {
         cmd.print_help().unwrap();
     }
@@ -36,7 +44,7 @@ async fn main() {
 
 static D: bool = false; // change this if you need to debug the parser
 
-async fn interpret(file: String) {
+async fn interpret(file: String, debug: bool) {
     let contents = std::fs::read_to_string(file).unwrap();
     let contents = s1(contents).unwrap();
     if D {
@@ -54,15 +62,15 @@ async fn interpret(file: String) {
     if D {
         println!("S4: {:#?}", instrs);
     }
-    let state = new_global_state(false).await;
+    let state = new_global_state(debug).await;
     init_global_state(state.clone()).await;
     let f = make_function(state.clone(), instrs, None).await.unwrap();
     call(state.clone(), f, vec![]).await.unwrap();
 }
 
-async fn repl() {
+async fn repl(debug: bool) {
     println!("Welcome to the Bodu REPL!");
-    let state = new_global_state(false).await;
+    let state = new_global_state(debug).await;
     init_global_state(state.clone()).await;
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();

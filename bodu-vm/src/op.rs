@@ -1,5 +1,6 @@
-use std::{collections::HashMap, sync::Arc, pin::Pin};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 
+use rand::Rng;
 use tokio::sync::Mutex;
 
 use crate::{make_container, make_err, opfn, Container, Function, Gi, Instruction, Label, Object, ObjectProp, Operator, State, StateContainer, Value, VarIndex};
@@ -1228,6 +1229,18 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                     Operator::Pipe => make_fn!(state, opfn::pipe),
                 };
                 set_var(state.clone(), tmps, res, f).await?;
+            },
+            Instruction::Debug(res) => {
+                let debug = state.lock().await.debug;
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(debug))).await?;
+            },
+            Instruction::Release(res) => {
+                let debug = state.lock().await.debug;
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(!debug))).await?;
+            },
+            Instruction::Maybe(res) => {
+                let maybe = rand::rng().random::<bool>();
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(maybe))).await?;
             },
         }
         i += 1;

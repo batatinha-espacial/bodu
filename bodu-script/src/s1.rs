@@ -60,6 +60,9 @@ pub enum S1T {
     KeywordFn, // fn
     KeywordNull, // null
     Dollar, // $
+    KeywordDebug, // debug
+    KeywordRelease, // release
+    KeywordMaybe, // maybe
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -241,6 +244,9 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
                     "goto" => S1T::KeywordGoto,
                     "fn" | "func" | "function" => S1T::KeywordFn,
                     "null" => S1T::KeywordNull,
+                    "debug" => S1T::KeywordDebug,
+                    "release" => S1T::KeywordRelease,
+                    "maybe" => S1T::KeywordMaybe,
                     _ => S1T::Identifier(str)
                 });
             }

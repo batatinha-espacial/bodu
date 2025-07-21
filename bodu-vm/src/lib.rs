@@ -121,6 +121,9 @@ pub enum Instruction {
     SetPipeShorthand(VarIndex), // op
     OrThat(VarIndex, VarIndex, VarIndex), // result, op1, op2
     OperatorFn(VarIndex, Operator), // result, opfn
+    Debug(VarIndex), // result
+    Release(VarIndex), // result
+    Maybe(VarIndex), // result
 }
 
 #[derive(Clone, Debug)]

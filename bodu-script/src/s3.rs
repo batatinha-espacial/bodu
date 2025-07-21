@@ -51,8 +51,11 @@ pub enum S3T {
     OrThat(Box<S3T>, Box<S3T>), // expr ?? expr
     OperatorFn(Operator), // wrap the operator in brackets
     MultiLet(Vec<String>), // let (v1, v2, v3, ...)
-    Null,
+    Null, // null
     PipeShorthand, // $
+    Debug, // debug
+    Release, // release
+    Maybe, // maybe
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -112,6 +115,18 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         Some(S2T::PipeShorthand) => {
             *i += 1;
             Some((S3T::PipeShorthand, 1))
+        },
+        Some(S2T::Debug) => {
+            *i += 1;
+            Some((S3T::Debug, 1))
+        },
+        Some(S2T::Release) => {
+            *i += 1;
+            Some((S3T::Release, 1))
+        },
+        Some(S2T::Maybe) => {
+            *i += 1;
+            Some((S3T::Maybe, 1))
         },
         Some(S2T::PlusFn) => {
             *i += 1;

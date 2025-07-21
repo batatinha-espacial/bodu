@@ -77,6 +77,9 @@ fn expr(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::OperatorFn(op) => operatorfn(op, res, tempi),
         S3T::Null => null(tempi),
         S3T::PipeShorthand => pipe_shorthand(res, tempi),
+        S3T::Debug => debug(res, tempi),
+        S3T::Release => release(res, tempi),
+        S3T::Maybe => maybe(res, tempi),
         _ => Err("invalid expression".to_string()),
     }
 }
@@ -791,5 +794,26 @@ fn pipe_shorthand(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarInde
     let r = *tempi;
     *tempi += 1;
     res.push(Instruction::GetPipeShorthand(VarIndex::Temp(r)));
+    Ok(VarIndex::Temp(r))
+}
+
+fn debug(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    res.push(Instruction::Debug(VarIndex::Temp(r)));
+    Ok(VarIndex::Temp(r))
+}
+
+fn release(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    res.push(Instruction::Release(VarIndex::Temp(r)));
+    Ok(VarIndex::Temp(r))
+}
+
+fn maybe(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    res.push(Instruction::Maybe(VarIndex::Temp(r)));
     Ok(VarIndex::Temp(r))
 }

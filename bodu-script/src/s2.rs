@@ -89,6 +89,9 @@ pub enum S2T {
     PipeFn, // [|>]
     Null, // null
     PipeShorthand, // $
+    Debug, // debug
+    Release, // release
+    Maybe, // maybe
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -336,6 +339,9 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordFn => res.push(S2T::Fn),
             S1T::KeywordNull => res.push(S2T::Null),
             S1T::Dollar => res.push(S2T::PipeShorthand),
+            S1T::KeywordDebug => res.push(S2T::Debug),
+            S1T::KeywordRelease => res.push(S2T::Release),
+            S1T::KeywordMaybe => res.push(S2T::Maybe),
         }
     }
     let s2 = res;
