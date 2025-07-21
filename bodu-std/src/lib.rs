@@ -20,6 +20,7 @@ mod event;
 mod math;
 mod object;
 mod regex;
+mod string;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -231,7 +232,23 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "regex".to_string(), regex_obj).await.unwrap();
     }
     make_function!(state, scope, "sleep", sleep);
-    make_function!(state, scope, "string", string);
+    make_function!(state, scope, "stderr", stderr);
+    make_function!(state, scope, "stdout", stdout);
+    {
+        let string_obj = {
+            let mut obj = make_object_base();
+            let metaobj = make_object();
+            set_base(state.clone(), metaobj.clone(), "call".to_string(), make_fn!(state, string)).await.unwrap();
+            obj.metaobj = metaobj;
+            make_container(Value::Object(obj))
+        };
+        make_function!(state, string_obj, "chars", string::chars);
+        make_function!(state, string_obj, "count_chars", string::count_chars);
+        make_function!(state, string_obj, "len", string::len);
+        make_function!(state, string_obj, "ords", string::ords);
+        make_function!(state, string_obj, "trim", string::trim);
+        set_base(state.clone(), scope.clone(), "string".to_string(), string_obj).await.unwrap();
+    }
     make_function!(state, scope, "type", type_);
 }
 
@@ -256,6 +273,32 @@ async fn eprint(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Co
     let args = args2;
     let str = args.join("\t");
     eprintln!("{}", str);
+    Ok(make_container(Value::Null))
+}
+
+async fn stdout(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    let args = args.iter().map(|a| to_string_base(state.clone(), a.clone())).collect::<Vec<_>>();
+    let mut args2 = Vec::new();
+    for i in args {
+        args2.push(i.await?);
+    }
+    let args = args2;
+    let str = args.join("\t");
+    print!("{}", str);
+    std::io::stdout().flush().unwrap();
+    Ok(make_container(Value::Null))
+}
+
+async fn stderr(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    let args = args.iter().map(|a| to_string_base(state.clone(), a.clone())).collect::<Vec<_>>();
+    let mut args2 = Vec::new();
+    for i in args {
+        args2.push(i.await?);
+    }
+    let args = args2;
+    let str = args.join("\t");
+    eprint!("{}", str);
+    std::io::stderr().flush().unwrap();
     Ok(make_container(Value::Null))
 }
 
@@ -358,6 +401,7 @@ async fn awaitfn(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<C
 }
 
 async fn string(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    let args = args[1..].to_vec();
     if args.len() == 0 {
         return Err(make_container(Value::String("string requires 1 argument".to_string())))
     }
