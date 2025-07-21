@@ -12,13 +12,14 @@ use crate::vm::{make_container, make_err, op::{call, make_object, make_object_ba
 // TODO: add comments
 
 mod array;
-mod iter;
-mod os;
 mod buffer;
-mod json;
 mod event;
+mod iter;
+mod json;
 mod math;
 mod object;
+mod os;
+mod readline;
 mod regex;
 mod string;
 
@@ -218,6 +219,11 @@ pub async fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "print", print);
     make_function!(state, scope, "range", range);
+    {
+        let readline_obj = make_object();
+        make_function!(state, readline_obj, "new", readline::new);
+        set_base(state.clone(), scope.clone(), "readline".to_string(), readline_obj).await.unwrap();
+    }
     {
         let regex_obj = make_object();
         make_function!(state, regex_obj, "captures", regex::captures);

@@ -136,6 +136,7 @@ dependencies = [
  "bodu-script",
  "bodu-vm",
  "regex",
+ "rustyline",
  "serde_json",
  "tokio",
 ]
