@@ -907,13 +907,13 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
         match instrs[i].clone() {
             Instruction::Return(vi) => {
                 if defers.len() > 0 {
-                    Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                    Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                 }
                 return Ok((Some(get_var(state.clone(), args, tmps, vi.clone()).await?), None))
             },
             Instruction::Throw(vi) => {
                 if defers.len() > 0 {
-                    Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                    Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                 }
                 return Err(get_var(state.clone(), args, tmps, vi.clone()).await?)
             },
@@ -983,7 +983,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                     Some(u) => i = *u,
                     None => {
                         if defers.len() > 0 {
-                            Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                            Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                         }
                         return Ok((None, Some(l.clone())))
                     },
@@ -1012,7 +1012,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                         Some(u) => i = *u,
                         None => {
                             if defers.len() > 0 {
-                                Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                                Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                             }
                             return Ok((None, Some(l.clone())))
                         },
@@ -1025,7 +1025,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                 match r {
                     (Some(v), l) => {
                         if defers.len() > 0 {
-                            Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                            Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                         }
                         return Ok((Some(v), l))
                     },
@@ -1038,7 +1038,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                             Some(u) => i = *u,
                             None => {
                                 if defers.len() > 0 {
-                                    Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                                    Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                                 }
                                 return Ok((None, Some(l.clone())))
                             },
@@ -1108,7 +1108,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                                     Some(u) => i = *u,
                                     None => {
                                         if defers.len() > 0 {
-                                            Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+                                            Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
                                         }
                                         return Ok((None, Some(l.clone())))
                                     },
@@ -1242,11 +1242,35 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                 let maybe = rand::rng().random::<bool>();
                 set_var(state.clone(), tmps, res, make_container(Value::Boolean(maybe))).await?;
             },
+            Instruction::ToNumber(res, op) => {
+                let op = get_var(state.clone(), args, tmps, op).await?;
+                let r = to_number(state.clone(), op).await?;
+                set_var(state.clone(), tmps, res, r).await?;
+            },
+            Instruction::Iterate(r1, r2, it) => {
+                let it = get_var(state.clone(), args, tmps, it).await?;
+                let r = call(state.clone(), it, vec![]).await?;
+                let r = detuple(state.clone(), r).await?;
+                let b = match r.get(0) {
+                    None => return Err(make_err("invalid iterator used in loop")),
+                    Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+                };
+                if b {
+                    let rv = match r.get(1) {
+                        None => return Err(make_err("invalid iterator used in loop")),
+                        Some(v) => v.clone(),
+                    };
+                    set_var(state.clone(), tmps, r1, make_container(Value::Boolean(true))).await?;
+                    set_var(state.clone(), tmps, r2, rv).await?;
+                } else {
+                    set_var(state.clone(), tmps, r1, make_container(Value::Boolean(false))).await?;
+                }
+            },
         }
         i += 1;
     }
     if defers.len() > 0 {
-        Box::pin(interpret_instructions(state.clone(), args, tmps, &defers, None)).await?;
+        Box::pin(interpret_instructions(state.clone(), args, tmps, &defers.clone().into_iter().rev().collect(), None)).await?;
     }
     Ok((None, None))
 }

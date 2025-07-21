@@ -92,6 +92,13 @@ pub enum S2T {
     Debug, // debug
     Release, // release
     Maybe, // maybe
+    For, // for
+    In, // in
+    Before, // before
+    Again, // again
+    After, // after
+    Continue, // continue
+    Break, // break
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -342,6 +349,13 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordDebug => res.push(S2T::Debug),
             S1T::KeywordRelease => res.push(S2T::Release),
             S1T::KeywordMaybe => res.push(S2T::Maybe),
+            S1T::KeywordFor => res.push(S2T::For),
+            S1T::KeywordIn => res.push(S2T::In),
+            S1T::KeywordBefore => res.push(S2T::Before),
+            S1T::KeywordAgain => res.push(S2T::Again),
+            S1T::KeywordAfter => res.push(S2T::After),
+            S1T::KeywordContinue => res.push(S2T::Continue),
+            S1T::KeywordBreak => res.push(S2T::Break),
         }
     }
     let s2 = res;

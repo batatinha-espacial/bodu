@@ -17,8 +17,6 @@ pub enum S3T {
     TryCatchFinally(Vec<S3T>, String, Vec<S3T>, Option<Vec<S3T>>), // try, catch, finally: try { ... } catch name { ... } finally { ... }
     Return(Box<S3T>), // return: expr
     Throw(Box<S3T>), // throw: expr
-    Loop(Vec<S3T>), // loop: loop { ... }
-    WhileUntil(LoopType, Box<S3T>, Vec<S3T>), // while, until: while/until, condition, { ... }
     Defer(Vec<S3T>), // defer: { ... }
     Bind(String, Box<S3T>), // bind: name, expr
     Function(Option<String>, Vec<String>, Vec<S3T>), // fn: name, ...args, { ... }
@@ -56,6 +54,9 @@ pub enum S3T {
     Debug, // debug
     Release, // release
     Maybe, // maybe
+    Loop(Vec<S3T>, LoopType, Vec<S3T>, Vec<S3T>, Vec<S3T>, Vec<S3T>),
+    Continue(Option<Box<S3T>>),
+    Break(Option<Box<S3T>>),
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -64,10 +65,15 @@ pub enum ConditionType {
     Unless,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum LoopType {
-    While,
-    Until,
+    Loop,
+    LoopN(Box<S3T>),
+    While(Box<S3T>),
+    Until(Box<S3T>),
+    For(String, Box<S3T>),
+    ForWhile(String, Box<S3T>, Box<S3T>),
+    ForUntil(String, Box<S3T>, Box<S3T>),
 }
 
 pub fn s3(input: Vec<S2T>) -> Result<Vec<S3T>, String> {
@@ -287,6 +293,37 @@ fn field(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                             },
                         }
                     },
+                    Some(S2T::OpenParen) => {
+                        *i += 1;
+                        n += 1;
+                        match input.get(*i) {
+                            Some(S2T::CloseParen) => {
+                                *i += 1;
+                                n += 1;
+                                S3T::FnCall(Box::new(v), vec![])
+                            },
+                            _ => match expr_list(input, i) {
+                                Some((vv, nn)) => {
+                                    n += nn;
+                                    match input.get(*i) {
+                                        Some(S2T::CloseParen) => {
+                                            *i += 1;
+                                            n += 1;
+                                            S3T::FnCall(Box::new(v), vv)
+                                        },
+                                        _ => {
+                                            *i -= n;
+                                            return None;
+                                        }
+                                    }
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            },
+                        }
+                    },
                     _ => break,
                 };
             }
@@ -355,50 +392,7 @@ fn expr_list(input: &Vec<S2T>, i: &mut usize) -> Option<(Vec<S3T>, usize)> {
 }
 
 fn fn_call(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
-    match field(input, i) {
-        Some((v, n)) => {
-            let mut v = v;
-            let mut n = n;
-            loop {
-                v = match input.get(*i) {
-                    Some(S2T::OpenParen) => {
-                        *i += 1;
-                        n += 1;
-                        match input.get(*i) {
-                            Some(S2T::CloseParen) => {
-                                *i += 1;
-                                n += 1;
-                                S3T::FnCall(Box::new(v), vec![])
-                            },
-                            _ => match expr_list(input, i) {
-                                Some((vv, nn)) => {
-                                    n += nn;
-                                    match input.get(*i) {
-                                        Some(S2T::CloseParen) => {
-                                            *i += 1;
-                                            n += 1;
-                                            S3T::FnCall(Box::new(v), vv)
-                                        },
-                                        _ => {
-                                            *i -= n;
-                                            return None;
-                                        }
-                                    }
-                                },
-                                _ => {
-                                    *i -= n;
-                                    return None;
-                                },
-                            },
-                        }
-                    },
-                    _ => break,
-                };
-            }
-            Some((v, n))
-        },
-        _ => None,
-    }
+    field(input, i)
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -1334,64 +1328,6 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
     };
     let t = match t {
         Some(t) => Some(t),
-        _ => {
-            let looptype = match input.get(*i) {
-                Some(S2T::While) => Some(LoopType::While),
-                Some(S2T::Until) => Some(LoopType::Until),
-                _ => None,
-            };
-            match looptype {
-                Some(looptype) => {
-                    let mut n = 1;
-                    *i += 1;
-                    let cond = match expr(input, i) {
-                        Some((v, nn)) => {
-                            n += nn;
-                            v
-                        },
-                        _ => {
-                            *i -= n;
-                            return None;
-                        },
-                    };
-                    let body = match input.get(*i) {
-                        Some(S2T::OpenBrace) => {
-                            n += 1;
-                            *i += 1;
-                            match stat_list(input, i) {
-                                Some((v, nn)) => {
-                                    n += nn;
-                                    match input.get(*i) {
-                                        Some(S2T::CloseBrace) => {
-                                            n += 1;
-                                            *i += 1;
-                                            v
-                                        },
-                                        _ => {
-                                            *i -= n;
-                                            return None;
-                                        },
-                                    }
-                                },
-                                _ => {
-                                    *i -= n;
-                                    return None;
-                                },
-                            }
-                        },
-                        _ => {
-                            *i -= n;
-                            return None;
-                        },
-                    };
-                    Some((S3T::WhileUntil(looptype, Box::new(cond), body), n))
-                },
-                _ => None,
-            }
-        },
-    };
-    let t = match t {
-        Some(t) => Some(t),
         _ => match input.get(*i) {
             Some(S2T::Defer) => {
                 let mut n = 1;
@@ -1612,6 +1548,112 @@ fn stat(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
             _ => None,
         },
     };
+    let t = match t {
+        Some(t) => Some(t),
+        _ => match input.get(*i) {
+            Some(S2T::Continue) => {
+                let mut n = 1;
+                *i += 1;
+                match input.get(*i) {
+                    Some(S2T::Semicolon) => {
+                        n += 1;
+                        *i += 1;
+                        Some((S3T::Continue(None), n))
+                    },
+                    _ => match expr(input, i) {
+                        Some((v, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::Semicolon) => {
+                                    n += 1;
+                                    *i += 1;
+                                    Some((S3T::Continue(Some(Box::new(v))), n))
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => match stat_expr(input, i) {
+                            Some((v, nn)) => {
+                                n += nn;
+                                match input.get(*i) {
+                                    Some(S2T::Semicolon) => {
+                                        n += 1;
+                                        *i += 1;
+                                        Some((S3T::Continue(Some(Box::new(v))), n))
+                                    },
+                                    _ => {
+                                        *i -= n;
+                                        return None;
+                                    },
+                                }
+                            },
+                            _ => {
+                                *i -= n;
+                                return None;
+                            },
+                        },
+                    },
+                }
+            },
+            _ => None,
+        },
+    };
+    let t = match t {
+        Some(t) => Some(t),
+        _ => match input.get(*i) {
+            Some(S2T::Break) => {
+                let mut n = 1;
+                *i += 1;
+                match input.get(*i) {
+                    Some(S2T::Semicolon) => {
+                        n += 1;
+                        *i += 1;
+                        Some((S3T::Break(None), n))
+                    },
+                    _ => match expr(input, i) {
+                        Some((v, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::Semicolon) => {
+                                    n += 1;
+                                    *i += 1;
+                                    Some((S3T::Break(Some(Box::new(v))), n))
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => match stat_expr(input, i) {
+                            Some((v, nn)) => {
+                                n += nn;
+                                match input.get(*i) {
+                                    Some(S2T::Semicolon) => {
+                                        n += 1;
+                                        *i += 1;
+                                        Some((S3T::Break(Some(Box::new(v))), n))
+                                    },
+                                    _ => {
+                                        *i -= n;
+                                        return None;
+                                    },
+                                }
+                            },
+                            _ => {
+                                *i -= n;
+                                return None;
+                            },
+                        },
+                    },
+                }
+            },
+            _ => None,
+        },
+    };
     t
 }
 
@@ -1791,42 +1833,8 @@ fn stat_expr(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
     };
     let t = match t {
         Some(t) => Some(t),
-        _ => match input.get(*i) {
-            Some(S2T::Loop) => {
-                let mut n = 1;
-                *i += 1;
-                let loop_ = match input.get(*i) {
-                    Some(S2T::OpenBrace) => {
-                        n += 1;
-                        *i += 1;
-                        match stat_list(input, i) {
-                            Some((v, nn)) => {
-                                n += nn;
-                                match input.get(*i) {
-                                    Some(S2T::CloseBrace) => {
-                                        n += 1;
-                                        *i += 1;
-                                        v
-                                    },
-                                    _ => {
-                                        *i -= n;
-                                        return None;
-                                    },
-                                }
-                            },
-                            _ => {
-                                *i -= n;
-                                return None;
-                            },
-                        }
-                    },
-                    _ => {
-                        *i -= n;
-                        return None;
-                    },
-                };
-                Some((S3T::Loop(loop_), n))
-            },
+        _ => match loop_(input, i) {
+            Some((v, n)) => Some((S3T::Loop(v.0, v.1, v.2, v.3, v.4, v.5), n)),
             _ => None,
         },
     };
@@ -1869,6 +1877,308 @@ fn stat_expr(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         },
     };
     t
+}
+
+fn loop_(input: &Vec<S2T>, i: &mut usize) -> Option<((Vec<S3T>, LoopType, Vec<S3T>, Vec<S3T>, Vec<S3T>, Vec<S3T>), usize)> {
+    let mut n = 0;
+    let v1 = match input.get(*i) {
+        Some(S2T::Before) => {
+            n += 1;
+            *i += 1;
+            match input.get(*i) {
+                Some(S2T::OpenBrace) => {
+                    n += 1;
+                    *i += 1;
+                    match stat_list(input, i) {
+                        Some((v, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::CloseBrace) => {
+                                    *i += 1;
+                                    n += 1;
+                                    v
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            return None;
+                        },
+                    }
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        _ => vec![],
+    };
+    let v2 = match input.get(*i) {
+        Some(S2T::Loop) => {
+            *i += 1;
+            n += 1;
+            match input.get(*i) {
+                Some(S2T::OpenBrace) => LoopType::Loop,
+                _ => match expr(input, i) {
+                    Some((v, nn)) => {
+                        n += nn;
+                        LoopType::LoopN(Box::new(v))
+                    },
+                    _ => {
+                        *i -= n;
+                        return None;
+                    },
+                }
+            }
+        },
+        Some(S2T::While) => {
+            *i += 1;
+            n += 1;
+            match expr(input, i) {
+                Some((v, nn)) => {
+                    n += nn;
+                    LoopType::While(Box::new(v))
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        Some(S2T::Until) => {
+            *i += 1;
+            n += 1;
+            match expr(input, i) {
+                Some((v, nn)) => {
+                    n += nn;
+                    LoopType::Until(Box::new(v))
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        Some(S2T::For) => {
+            *i += 1;
+            n += 1;
+            match input.get(*i) {
+                Some(S2T::Identifier(s)) => {
+                    *i += 1;
+                    n += 1;
+                    match input.get(*i) {
+                        Some(S2T::In) => {
+                            *i += 1;
+                            n += 1;
+                            match expr(input, i) {
+                                Some((v, nn)) => {
+                                    n += nn;
+                                    match input.get(*i) {
+                                        Some(S2T::OpenBrace) => LoopType::For(s.clone(), Box::new(v)),
+                                        Some(S2T::While) => {
+                                            *i += 1;
+                                            n += 1;
+                                            match expr(input, i) {
+                                                Some((vv, nn)) => {
+                                                    n += nn;
+                                                    LoopType::ForWhile(s.clone(), Box::new(v), Box::new(vv))
+                                                },
+                                                _ => {
+                                                    *i -= n;
+                                                    return None;
+                                                },
+                                            }
+                                        },
+                                        Some(S2T::Until) => {
+                                            *i += 1;
+                                            n += 1;
+                                            match expr(input, i) {
+                                                Some((vv, nn)) => {
+                                                    n += nn;
+                                                    LoopType::ForUntil(s.clone(), Box::new(v), Box::new(vv))
+                                                },
+                                                _ => {
+                                                    *i -= n;
+                                                    return None;
+                                                },
+                                            }
+                                        },
+                                        _ => {
+                                            *i -= n;
+                                            return None;
+                                        },
+                                    }
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            return None;
+                        },
+                    }
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        _ => {
+            *i -= n;
+            return None;
+        },
+    };
+    let v3 = match input.get(*i) {
+        Some(S2T::OpenBrace) => {
+            *i += 1;
+            n += 1;
+            match stat_list(input, i) {
+                Some((v, nn)) => {
+                    n += nn;
+                    match input.get(*i) {
+                        Some(S2T::CloseBrace) => {
+                            *i += 1;
+                            n += 1;
+                            v
+                        },
+                        _ => {
+                            *i -= n;
+                            return None;
+                        },
+                    }
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        _ => {
+            *i -= n;
+            return None;
+        },
+    };
+    let v4 = match input.get(*i) {
+        Some(S2T::Again) => {
+            n += 1;
+            *i += 1;
+            match input.get(*i) {
+                Some(S2T::OpenBrace) => {
+                    n += 1;
+                    *i += 1;
+                    match stat_list(input, i) {
+                        Some((v, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::CloseBrace) => {
+                                    *i += 1;
+                                    n += 1;
+                                    v
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            return None;
+                        },
+                    }
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        _ => vec![],
+    };
+    let v5 = match input.get(*i) {
+        Some(S2T::After) => {
+            n += 1;
+            *i += 1;
+            match input.get(*i) {
+                Some(S2T::OpenBrace) => {
+                    n += 1;
+                    *i += 1;
+                    match stat_list(input, i) {
+                        Some((v, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::CloseBrace) => {
+                                    *i += 1;
+                                    n += 1;
+                                    v
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            return None;
+                        },
+                    }
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        _ => vec![],
+    };
+    let v6 = match input.get(*i) {
+        Some(S2T::Else) => {
+            n += 1;
+            *i += 1;
+            match input.get(*i) {
+                Some(S2T::OpenBrace) => {
+                    n += 1;
+                    *i += 1;
+                    match stat_list(input, i) {
+                        Some((v, nn)) => {
+                            n += nn;
+                            match input.get(*i) {
+                                Some(S2T::CloseBrace) => {
+                                    *i += 1;
+                                    n += 1;
+                                    v
+                                },
+                                _ => {
+                                    *i -= n;
+                                    return None;
+                                },
+                            }
+                        },
+                        _ => {
+                            *i -= n;
+                            return None;
+                        },
+                    }
+                },
+                _ => {
+                    *i -= n;
+                    return None;
+                },
+            }
+        },
+        _ => vec![],
+    };
+    Some(((v1, v2, v3, v4, v5, v6), n))
 }
 
 fn function(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {

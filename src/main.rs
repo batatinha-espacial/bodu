@@ -42,7 +42,7 @@ async fn main() {
     }
 }
 
-static D: bool = false; // change this if you need to debug the parser
+static D: bool = true; // change this if you need to debug the parser
 
 async fn interpret(file: String, debug: bool) {
     let contents = std::fs::read_to_string(file).unwrap();

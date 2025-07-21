@@ -63,6 +63,13 @@ pub enum S1T {
     KeywordDebug, // debug
     KeywordRelease, // release
     KeywordMaybe, // maybe
+    KeywordFor, // for
+    KeywordIn, // in
+    KeywordBefore, // before
+    KeywordAgain, // again
+    KeywordAfter, // after
+    KeywordContinue, // continue
+    KeywordBreak, // break
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -242,11 +249,18 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
                     "defer" => S1T::KeywordDefer,
                     "bind" => S1T::KeywordBind,
                     "goto" => S1T::KeywordGoto,
-                    "fn" | "func" | "function" => S1T::KeywordFn,
+                    "fn" | "fun" | "func" | "function" => S1T::KeywordFn,
                     "null" => S1T::KeywordNull,
                     "debug" => S1T::KeywordDebug,
                     "release" => S1T::KeywordRelease,
                     "maybe" => S1T::KeywordMaybe,
+                    "for" => S1T::KeywordFor,
+                    "in" => S1T::KeywordIn,
+                    "before" => S1T::KeywordBefore,
+                    "again" => S1T::KeywordAgain,
+                    "after" => S1T::KeywordAfter,
+                    "continue" => S1T::KeywordContinue,
+                    "break" => S1T::KeywordBreak,
                     _ => S1T::Identifier(str)
                 });
             }

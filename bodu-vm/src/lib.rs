@@ -124,6 +124,8 @@ pub enum Instruction {
     Debug(VarIndex), // result
     Release(VarIndex), // result
     Maybe(VarIndex), // result
+    ToNumber(VarIndex, VarIndex), // result, op
+    Iterate(VarIndex, VarIndex, VarIndex), // r1, r2, it
 }
 
 #[derive(Clone, Debug)]
