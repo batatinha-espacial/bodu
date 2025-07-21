@@ -114,6 +114,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, event_obj, "new", event::new);
         set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).await.unwrap();
     }
+    make_function!(state, scope, "exec", exec);
     make_function!(state, scope, "float", float);
     make_function!(state, scope, "from_bin", from_bin);
     make_function!(state, scope, "from_hex", from_hex);
@@ -636,4 +637,13 @@ async fn load_here(state: StateContainer, args: Vec<Container>, _: Gi) -> Result
     let code = bodu_script::s4::s4(code).map_err(|s| make_err(&format!("parsing error inside load_here (S4): {}", s)))?;
     let f = make_function(state.clone(), code, Some(state.clone())).await?;
     Ok(f)
+}
+
+async fn exec(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("run requires 1 argument"));
+    }
+    let load_ = make_fn!(state, load);
+    let f = call(state.clone(), load_, args.clone()).await?;
+    call(state.clone(), f, vec![]).await
 }
