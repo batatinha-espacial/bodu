@@ -41,6 +41,18 @@ fn array_len_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std
     })
 }
 
+fn array_shift_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        shift(state, args, gi).await
+    })
+}
+
+fn array_unshift_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        unshift(state, args, gi).await
+    })
+}
+
 fn meta_add_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
     Box::pin(async move {
         meta_add(state, args, gi).await
@@ -114,6 +126,8 @@ pub async fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result
     helper1!(state, array_push_wrapper, o, "push");
     helper1!(state, array_iter_wrapper, o, "iter");
     helper1!(state, array_len_wrapper, o, "len");
+    helper1!(state, array_shift_wrapper, o, "shift");
+    helper1!(state, array_unshift_wrapper, o, "unshift");
 
     Ok(o)
 }
@@ -326,5 +340,35 @@ async fn len(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, 
     let o = o.externals.get(&0).unwrap().clone();
     let mut o = o.lock().await;
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
+    Ok(make_container(Value::Number(o.len() as i64)))
+}
+
+async fn shift(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<Container>>().unwrap();
+    if o.len() == 0 {
+        Ok(make_container(Value::Null))
+    } else {
+        let i = o.remove(0);
+        Ok(i)
+    }
+}
+
+async fn unshift(_: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<Container>>().unwrap();
+    *o = o.clone().into_iter().chain(args.clone().into_iter()).collect();
     Ok(make_container(Value::Number(o.len() as i64)))
 }
