@@ -19,6 +19,7 @@ mod json;
 mod event;
 mod math;
 mod object;
+mod regex;
 
 macro_rules! make_function {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
@@ -78,6 +79,7 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
         threads: HashMap::new(),
         threadid: 0,
         exitcode: 0,
+        regex: HashMap::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s
@@ -209,6 +211,20 @@ pub async fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "print", print);
     make_function!(state, scope, "range", range);
+    {
+        let regex_obj = make_object();
+        make_function!(state, regex_obj, "captures", regex::captures);
+        make_function!(state, regex_obj, "captures_many", regex::captures_many);
+        make_function!(state, regex_obj, "find", regex::find);
+        make_function!(state, regex_obj, "find_many", regex::find_many);
+        make_function!(state, regex_obj, "is_match", regex::is_match);
+        make_function!(state, regex_obj, "replace", regex::replace);
+        make_function!(state, regex_obj, "replace_all", regex::replace_all);
+        make_function!(state, regex_obj, "replacen", regex::replacen);
+        make_function!(state, regex_obj, "split", regex::split);
+        make_function!(state, regex_obj, "splitn", regex::splitn);
+        set_base(state.clone(), scope.clone(), "regex".to_string(), regex_obj).await.unwrap();
+    }
     make_function!(state, scope, "sleep", sleep);
     make_function!(state, scope, "string", string);
     make_function!(state, scope, "type", type_);

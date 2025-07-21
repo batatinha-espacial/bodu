@@ -9,3 +9,4 @@ base64 = "0.22.1"
 bodu-vm = { path = "../bodu-vm" }
 tokio = { version = "1.46.1", features = ["full"] }
 bodu-script = { path = "../bodu-script" }
+regex = "1.11.1"

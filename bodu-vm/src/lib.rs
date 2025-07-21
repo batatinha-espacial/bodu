@@ -70,6 +70,7 @@ pub struct GlobalData {
     pub threads: HashMap<u64, JoinHandle<Result<Container, Container>>>,
     pub threadid: u64,
     pub exitcode: u8,
+    pub regex: HashMap<String, Result<regex::Regex, ()>>,
 }
 
 // Container but for States
