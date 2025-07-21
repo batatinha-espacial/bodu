@@ -76,6 +76,7 @@ macro_rules! helper1 {
             internals: HashMap::new(),
             call: $fcall,
             state: $state.clone(),
+            caller_state: false,
         };
         fn_.internals.insert(0, $o.clone());
         set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_))).await?;
@@ -88,6 +89,7 @@ macro_rules! helper2 {
             internals: HashMap::new(),
             call: $fcall,
             state: $state.clone(),
+            caller_state: false,
         };
         set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_))).await?;
     }};
@@ -231,6 +233,7 @@ async fn iter(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Contai
             internals,
             call: iter_next_wrapper,
             state: state.clone(),
+            caller_state: false,
         }
     };
     Ok(make_container(Value::Function(f)))

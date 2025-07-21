@@ -1,3 +1,4 @@
+use bodu_vm::op::make_function;
 pub use bodu_vm as vm;
 
 use std::{collections::HashMap, io::Write, sync::Arc};
@@ -36,6 +37,29 @@ macro_rules! make_fn {
                 })
             },
             state: $state.clone(),
+            caller_state: false,
+        }))
+    };
+}
+
+macro_rules! make_function_true {
+    ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
+        let f = make_fn_true!($state, $fcall);
+        set_base($state.clone(), $scope.clone(), $prop.to_string(), f).await.unwrap();
+    }};
+}
+
+macro_rules! make_fn_true {
+    ($state:expr, $fcall:expr) => {
+        make_container(Value::Function(Function {
+            internals: HashMap::new(),
+            call: |state, args, gi| {
+                Box::pin(async move {
+                    $fcall(state, args, gi).await
+                })
+            },
+            state: $state.clone(),
+            caller_state: true,
         }))
     };
 }
@@ -68,9 +92,9 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, array_object, "new", array::new);
         set_base(state.clone(), scope.clone(), "array".to_string(), array_object).await.unwrap();
     }
-    make_function!(state, scope, "async", async_);
+    make_function_true!(state, scope, "async", async_);
     make_function!(state, scope, "await", await_);
-    make_function!(state, scope, "awaitfn", awaitfn);
+    make_function_true!(state, scope, "awaitfn", awaitfn);
     make_function!(state, scope, "bin", bin);
     make_function!(state, scope, "boolean", boolean);
     make_function!(state, scope, "btoa", btoa);
@@ -98,11 +122,11 @@ pub async fn init_global_state(state: StateContainer) {
     make_function!(state, scope, "input", input);
     {
         let iter_object = make_object();
-        make_function!(state, iter_object, "all", iter::all);
-        make_function!(state, iter_object, "any", iter::any);
-        make_function!(state, iter_object, "chain", iter::chain);
-        make_function!(state, iter_object, "collect", iter::collect);
-        make_function!(state, iter_object, "cycle", iter::cycle);
+        make_function_true!(state, iter_object, "all", iter::all);
+        make_function_true!(state, iter_object, "any", iter::any);
+        make_function_true!(state, iter_object, "chain", iter::chain);
+        make_function_true!(state, iter_object, "collect", iter::collect);
+        make_function_true!(state, iter_object, "cycle", iter::cycle);
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).await.unwrap();
     }
     {
@@ -111,6 +135,8 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, json_obj, "encode", json::encode);
         set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).await.unwrap();
     }
+    make_function!(state, scope, "load", load);
+    make_function_true!(state, scope, "load_here", load_here);
     {
         let math_obj = make_object();
         make_function!(state, math_obj, "abs", math::abs);
@@ -258,6 +284,7 @@ async fn async_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Co
             })
         },
         state: state.clone(),
+        caller_state: true,
     })))
 }
 
@@ -304,6 +331,7 @@ async fn awaitfn(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<C
             })
         },
         state: state.clone(),
+        caller_state: true,
     }));
     Ok(f)
 }
@@ -380,6 +408,7 @@ async fn range(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Con
                 })
             },
             state: state.clone(),
+            caller_state: false,
         }
     };
     Ok(make_container(Value::Function(f)))
@@ -564,4 +593,31 @@ async fn type_(_: StateContainer, args: Vec<Container>, _: Gi) -> Result<Contain
         Value::Function(_) => "function".to_string(),
         Value::Bind(_) => return Err(make_err("type failed to get type of value")),
     })))
+}
+
+async fn load(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("load requires 1 argument"));
+    }
+    let code = to_string_base(state.clone(), args[0].clone()).await?;
+    let global = state.as_ref().lock().await.global.clone().unwrap().clone();
+    let code = bodu_script::s1::s1(code).map_err(|s| make_err(&format!("parsing error inside load (S1): {}", s)))?;
+    let code = bodu_script::s2::s2(code).map_err(|s| make_err(&format!("parsing error inside load (S2): {}", s)))?;
+    let code = bodu_script::s3::s3(code).map_err(|s| make_err(&format!("parsing error inside load (S3): {}", s)))?;
+    let code = bodu_script::s4::s4(code).map_err(|s| make_err(&format!("parsing error inside load (S4): {}", s)))?;
+    let f = make_function(global.clone(), code, None).await?;
+    Ok(f)
+}
+
+async fn load_here(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("load_here requires 1 argument"));
+    }
+    let code = to_string_base(state.clone(), args[0].clone()).await?;
+    let code = bodu_script::s1::s1(code).map_err(|s| make_err(&format!("parsing error inside load_here (S1): {}", s)))?;
+    let code = bodu_script::s2::s2(code).map_err(|s| make_err(&format!("parsing error inside load_here (S2): {}", s)))?;
+    let code = bodu_script::s3::s3(code).map_err(|s| make_err(&format!("parsing error inside load_here (S3): {}", s)))?;
+    let code = bodu_script::s4::s4(code).map_err(|s| make_err(&format!("parsing error inside load_here (S4): {}", s)))?;
+    let f = make_function(state.clone(), code, Some(state.clone())).await?;
+    Ok(f)
 }

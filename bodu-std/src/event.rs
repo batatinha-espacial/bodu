@@ -31,6 +31,7 @@ macro_rules! helper1 {
                 })
             },
             state: $state.clone(),
+            caller_state: false,
         };
         fn_.internals.insert(0, $o.clone());
         set_base($state.clone(), $o.clone(), $prop.to_string(), make_container(Value::Function(fn_))).await?;

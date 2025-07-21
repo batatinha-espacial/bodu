@@ -131,6 +131,7 @@ pub async fn chain(state: StateContainer, args: Vec<Container>, _: Gi) -> Result
                 })
             },
             state: state.clone(),
+            caller_state: true,
         }
     };
     Ok(make_container(Value::Function(h)))
@@ -198,6 +199,7 @@ pub async fn cycle(state: StateContainer, args: Vec<Container>, _: Gi) -> Result
                 })
             },
             state: state.clone(),
+            caller_state: true,
         }
     };
     Ok(make_container(Value::Function(g)))

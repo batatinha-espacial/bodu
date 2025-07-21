@@ -44,7 +44,7 @@ pub async fn add(state: StateContainer, a: Container, b: Container) -> Result<Co
                         })
                     },
                     state: state.clone(),
-
+                    caller_state: true,
                 }
             };
             Ok(make_container(Value::Function(h)))
@@ -69,7 +69,11 @@ pub async fn call(state: StateContainer, f: Container, args: Vec<Container>) -> 
                 let i = f.internals.clone();
                 move |v: u64| {i.get(&v).map(|s| s.clone())}
             };
-            (f.call)(f.state.clone(), args, Arc::new(gi)).await
+            if f.caller_state {
+                (f.call)(state.clone(), args, Arc::new(gi)).await
+            } else {
+                (f.call)(f.state.clone(), args, Arc::new(gi)).await
+            }
         },
         Value::Object(obj) => {
             call_metaprop(state.clone(), obj, vec![g].iter().chain(args.iter()).map(|h| h.clone()).collect::<Vec<Container>>(), "call".to_string()).await
@@ -240,6 +244,7 @@ pub async fn multiply(state: StateContainer, a: Container, b: Container) -> Resu
                         })
                     },
                     state: state.clone(),
+                    caller_state: true,
                 }
             };
             Ok(make_container(Value::Function(g)))
@@ -281,6 +286,7 @@ pub async fn multiply(state: StateContainer, a: Container, b: Container) -> Resu
                         })
                     },
                     state: state.clone(),
+                    caller_state: true,
                 }
             };
             Ok(make_container(Value::Function(g)))
@@ -333,7 +339,7 @@ pub async fn subtract(state: StateContainer, a: Container, b: Container) -> Resu
                         })
                     },
                     state: state.clone(),
-
+                    caller_state: true,
                 }
             };
             Ok(make_container(Value::Function(h)))
@@ -500,7 +506,8 @@ pub async fn remainder(state: StateContainer, a: Container, b: Container) -> Res
                             Ok(make_container(Value::Null))
                         })
                     },
-                    state: state.clone()
+                    state: state.clone(),
+                    caller_state: true,
                 }
             };
             Ok(make_container(Value::Function(g)))
@@ -528,7 +535,8 @@ pub async fn remainder(state: StateContainer, a: Container, b: Container) -> Res
                             Ok(make_container(Value::Null))
                         })
                     },
-                    state: state.clone()
+                    state: state.clone(),
+                    caller_state: true,
                 }
             };
             Ok(make_container(Value::Function(g)))
@@ -758,6 +766,7 @@ pub async fn make_function(state: StateContainer, instrs: Vec<Instruction>, s: O
         internals,
         call: make_function_call,
         state: s,
+        caller_state: false,
     })))
 }
 
@@ -866,6 +875,7 @@ macro_rules! make_fn {
                 })
             },
             state: $state.clone(),
+            caller_state: false,
         }))
     }};
 }

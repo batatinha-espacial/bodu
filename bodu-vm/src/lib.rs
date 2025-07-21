@@ -44,6 +44,7 @@ pub struct Function {
     pub internals: HashMap<u64, Container>, // internal values used by the function
     pub call: fn(StateContainer, Vec<Container>, Gi) -> Pin<Box<dyn Future<Output = Result<Container, Container>> + Send>>, // the actual function
     pub state: StateContainer, // the state it runs on
+    pub caller_state: bool, // if true, the state of the caller is passed. otherwise, the state field is passed.
 }
 
 // Arc<Mutex<Value>>, used almost everywhere in the codebase
