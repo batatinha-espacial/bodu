@@ -135,6 +135,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function_true!(state, iter_object, "enumerate", iter::enumerate);
         make_function_true!(state, iter_object, "filter", iter::filter);
         make_function_true!(state, iter_object, "map", iter::map);
+        make_function_true!(state, iter_object, "reverse", iter::reverse);
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).await.unwrap();
     }
     {
@@ -246,6 +247,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function!(state, string_obj, "count_chars", string::count_chars);
         make_function!(state, string_obj, "len", string::len);
         make_function!(state, string_obj, "ords", string::ords);
+        make_function!(state, string_obj, "reverse", string::reverse);
         make_function!(state, string_obj, "trim", string::trim);
         set_base(state.clone(), scope.clone(), "string".to_string(), string_obj).await.unwrap();
     }

@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use bodu_vm::op::{get_base, make_object, set_base, to_number_base};
+use tokio::sync::Mutex;
 
 use crate::{array::{self, new_with_vec}, vm::{make_container, make_err, op::{call, call_prop, detuple, make_object_base, make_tuple, to_boolean_base}, Container, Function, Gi, StateContainer, Value}};
 
@@ -27,6 +28,62 @@ pub async fn collect(state: StateContainer, args: Vec<Container>, _: Gi) -> Resu
         v.push(rv);
     }
     new_with_vec(state.clone(), v).await
+}
+
+pub async fn reverse(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("iter.reverse requires 1 argument"))
+    }
+    let arg = args[0].clone();
+    let mut v = Vec::new();
+    loop {
+        let r = call(state.clone(), arg.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.collect")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            break;
+        }
+        let rv = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.collect")),
+            Some(v) => v.clone(),
+        };
+        v.push(rv);
+    }
+    let v = v.into_iter().rev().collect::<Vec<_>>();
+    let f = {
+        let mut internals = HashMap::new();
+        let mut oo = make_object_base();
+        oo.externals.insert(0, Arc::new(Mutex::new(Box::new(v.clone().into_iter()))));
+        let oo = make_container(Value::Object(oo));
+        internals.insert(0, oo);
+        Function {
+            internals,
+            call: reverse_next_wrapper,
+            state: state.clone(),
+            caller_state: false,
+        }
+    };
+    Ok(make_container(Value::Function(f)))
+}
+
+fn reverse_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let i = gi(0).unwrap();
+        let i = (match i.lock().await.clone() {
+            Value::Object(i) => Some(i),
+            _ => None,
+        }).unwrap();
+        let i = i.externals.get(&0).unwrap().clone();
+        let mut i = i.lock().await;
+        let i = i.downcast_mut::<<Vec<Container> as IntoIterator>::IntoIter>().unwrap();
+        Ok(match i.next() {
+            None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
+            Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), i.clone()]),
+        })
+    })
 }
 
 pub async fn all(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {

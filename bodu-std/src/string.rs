@@ -102,3 +102,11 @@ pub async fn trim(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
     let s = to_string_base(state.clone(), args[0].clone()).await?;
     Ok(make_container(Value::String(s.trim().to_string())))
 }
+
+pub async fn reverse(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.trim requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(s.chars().rev().collect())))
+}
