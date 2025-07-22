@@ -1,4 +1,5 @@
 use bodu::{libstd::{init_global_state, new_global_state}, script::{s1::s1, s2::s2, s3::s3, s4::s4}, vm::op::{call, make_function, new_state, to_string_base}};
+use bodu_vm::StateContainer;
 use clap::{Arg, ArgAction, Command};
 use rustyline::DefaultEditor;
 
@@ -66,6 +67,14 @@ async fn interpret(file: String, debug: bool) {
     init_global_state(state.clone()).await;
     let f = make_function(state.clone(), instrs, None).await.unwrap();
     call(state.clone(), f, vec![]).await.unwrap();
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.unwrap();
+            run_gdefers(state.clone()).await;
+        });
+    }
+    graceful(state.clone()).await;
 }
 
 async fn repl(debug: bool) {
@@ -144,5 +153,43 @@ async fn repl(debug: bool) {
             },
             _ => break,
         }
+    }
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.unwrap();
+            run_gdefers(state.clone()).await;
+        });
+    }
+    graceful(state.clone()).await;
+}
+
+async fn graceful(state: StateContainer) -> u8 {
+    loop {
+        let t = {
+            let threads = &mut *state.lock().await;
+            let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
+            if threads.threads.len() == 0 {
+                break;
+            }
+            threads.threads.remove(0)
+        };
+        t.await.unwrap()
+    }
+    {
+        let threads = &mut *state.lock().await;
+        let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
+        threads.exitcode
+    }
+}
+
+async fn run_gdefers(state: StateContainer) {
+    let gdefers = {
+        let threads = &mut *state.lock().await;
+        let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
+        threads.gdefers.clone()
+    };
+    for i in gdefers.into_iter().rev() {
+        let _ = call(state.clone(), i, vec![]).await;
     }
 }

@@ -78,10 +78,13 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
     let s2 = s.clone();
     s.lock().await.global = Some(s2);
     let gd = Arc::new(Mutex::new(GlobalData {
-        threads: HashMap::new(),
+        threads: Vec::new(),
+        threadawaited: HashMap::new(),
+        threadresult: HashMap::new(),
         threadid: 0,
         exitcode: 0,
         regex: HashMap::new(),
+        gdefers: Vec::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s
@@ -218,6 +221,7 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "os".to_string(), os_object).await.unwrap();
     }
     make_function!(state, scope, "print", print);
+    make_function!(state, scope, "push_gdefer", push_gdefer);
     make_function!(state, scope, "range", range);
     {
         let readline_obj = make_object();
@@ -341,12 +345,14 @@ async fn async_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Co
                 let globaldata = &mut *globaldata.globaldata.as_mut().unwrap().lock().await;
                 let tid = globaldata.threadid;
                 globaldata.threadid += 1;
-                globaldata.threads.insert(tid, tokio::spawn({
+                let (tx, rx) = std::sync::mpsc::channel();
+                globaldata.threadresult.insert(tid, rx);
+                globaldata.threads.push(tokio::spawn({
                     let f = f.clone();
                     let state = state.clone();
                     let args = args.clone();
                     async move {
-                        call(state, f, args).await
+                        let _ = tx.send(call(state, f, args).await);
                     }
                 }));
                 let mut obj = make_object_base();
@@ -382,9 +388,13 @@ async fn await_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Co
     let p = {
         let threads = &mut *state.lock().await;
         let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
-        threads.threads.remove(&p).unwrap()
+        if threads.threadawaited.contains_key(&p) {
+            return Err(make_err("promise passed to await was already awaited"));
+        }
+        threads.threadawaited.insert(p, ());
+        threads.threadresult.remove(&p).unwrap()
     };
-    p.into_future().await.unwrap()
+    p.recv().unwrap()
 }
 
 async fn awaitfn(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -738,4 +748,16 @@ async fn exec(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Cont
     let load_ = make_fn!(state, load);
     let f = call(state.clone(), load_, args.clone()).await?;
     call(state.clone(), f, vec![]).await
+}
+
+async fn push_gdefer(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("push_gdefer requires 1 argument"));
+    }
+    {
+        let threads = &mut *state.lock().await;
+        let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
+        threads.gdefers.push(args[0].clone());
+    }
+    Ok(make_container(Value::Null))
 }

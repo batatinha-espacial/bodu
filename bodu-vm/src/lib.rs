@@ -67,10 +67,13 @@ pub struct State {
 
 #[derive(Debug)]
 pub struct GlobalData {
-    pub threads: HashMap<u64, JoinHandle<Result<Container, Container>>>,
+    pub threads: Vec<JoinHandle<()>>,
+    pub threadawaited: HashMap<u64, ()>,
+    pub threadresult: HashMap<u64, std::sync::mpsc::Receiver<Result<Container, Container>>>,
     pub threadid: u64,
     pub exitcode: u8,
     pub regex: HashMap<String, Result<regex::Regex, ()>>,
+    pub gdefers: Vec<Container>,
 }
 
 // Container but for States
