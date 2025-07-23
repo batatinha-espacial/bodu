@@ -10,6 +10,7 @@ tokio = { version = "1.46.1", features = ["full"] }
 bodu-vm = { path = "./bodu-vm" }
 bodu-script = { path = "./bodu-script" }
 bodu-std = { path = "./bodu-std" }
+cbodu = { path = "./cbodu" }
 
 [features]
 default = ["extensions"]

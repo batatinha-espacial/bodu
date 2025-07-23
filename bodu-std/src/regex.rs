@@ -3,8 +3,6 @@ use regex::{Captures, Match, Regex};
 
 use crate::array::new_with_vec;
 
-// TODO: implement more methods
-
 async fn lookup_regex(state: StateContainer, s: String) -> Result<Regex, Container> {
     let global = state.lock().await.globaldata.clone().unwrap();
     let regmap = &mut global.lock().await.regex;

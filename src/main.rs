@@ -1,7 +1,9 @@
-use bodu::{libstd::{init_global_state, new_global_state}, script::{s1::s1, s2::s2, s3::s3, s4::s4}, vm::op::{call, make_function, new_state, to_string_base}};
-use bodu_vm::StateContainer;
+use bodu::custom_init;
 use clap::{Arg, ArgAction, Command};
 use rustyline::DefaultEditor;
+use bodu_script::{s1::s1, s2::s2, s3::s3, s4::s4};
+use bodu_std::{init_global_state, new_global_state};
+use bodu_vm::{op::{call, make_function, new_state, to_string_base}, StateContainer};
 
 #[tokio::main]
 async fn main() {
@@ -12,6 +14,14 @@ async fn main() {
             Arg::new("debug")
                 .short('D')
                 .long("debug")
+                .help("run in debug mode")
+                .action(ArgAction::SetTrue)
+                .global(true)
+        )
+        .arg(
+            Arg::new("experimental")
+                .short('E')
+                .long("experimental")
                 .help("run in debug mode")
                 .action(ArgAction::SetTrue)
                 .global(true)
@@ -34,10 +44,10 @@ async fn main() {
     if let Some(_) = matches.subcommand_matches("version") {
         println!("Bodu 0.1.0");
     } else if let Some(matches) = matches.subcommand_matches("repl") {
-        repl(matches.get_flag("debug")).await;
+        repl(matches.get_flag("debug"), matches.get_flag("experimental")).await;
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let file = matches.get_one::<String>("file").unwrap();
-        interpret(file.clone(), matches.get_flag("debug")).await;
+        interpret(file.clone(), matches.get_flag("debug"), matches.get_flag("experimental")).await;
     } else {
         cmd.print_help().unwrap();
     }
@@ -45,7 +55,7 @@ async fn main() {
 
 static D: bool = false; // change this if you need to debug the parser
 
-async fn interpret(file: String, debug: bool) {
+async fn interpret(file: String, debug: bool, experimental: bool) {
     let contents = std::fs::read_to_string(file).unwrap();
     let contents = s1(contents).unwrap();
     if D {
@@ -65,6 +75,9 @@ async fn interpret(file: String, debug: bool) {
     }
     let state = new_global_state(debug).await;
     init_global_state(state.clone()).await;
+    if experimental {
+        custom_init(state.clone()).await;
+    }
     let f = make_function(state.clone(), instrs, None).await.unwrap();
     call(state.clone(), f, vec![]).await.unwrap();
     {
@@ -77,10 +90,13 @@ async fn interpret(file: String, debug: bool) {
     graceful(state.clone()).await;
 }
 
-async fn repl(debug: bool) {
+async fn repl(debug: bool, experimental: bool) {
     println!("Welcome to the Bodu REPL!");
     let state = new_global_state(debug).await;
     init_global_state(state.clone()).await;
+    if experimental {
+        custom_init(state.clone()).await;
+    }
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();
     loop {

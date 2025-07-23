@@ -9,8 +9,6 @@ use tokio::sync::Mutex;
 
 use crate::vm::{make_container, make_err, op::{call, make_object, make_object_base, make_tuple, resolve_bind, set_base, to_boolean, to_float, to_number, to_number_base, to_string, to_string_base}, Container, Function, Gi, GlobalData, State, StateContainer, Value};
 
-// TODO: add comments
-
 mod array;
 mod buffer;
 mod event;

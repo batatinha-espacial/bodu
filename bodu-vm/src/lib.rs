@@ -80,7 +80,6 @@ pub struct GlobalData {
 pub type StateContainer = Arc<Mutex<State>>;
 
 // instructions for the VM
-// TODO: explain what these are
 #[derive(Clone, Debug)]
 pub enum Instruction {
     Add(VarIndex, VarIndex, VarIndex), // result, op1, op2
