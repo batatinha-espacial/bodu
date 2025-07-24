@@ -7,8 +7,6 @@ use bodu_vm::{op::{call, make_function, new_state, to_string_base}, StateContain
 
 #[tokio::main]
 async fn main() {
-    let local = tokio::task::LocalSet::new();
-    local.enter();
     let mut cmd = Command::new("bodu")
         .arg(
             Arg::new("debug")

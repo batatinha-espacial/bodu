@@ -136,6 +136,7 @@ dependencies = [
  "base64",
  "bodu-script",
  "bodu-vm",
+ "libloading",
  "regex",
  "rustyline",
  "serde_json",
@@ -146,6 +147,7 @@ dependencies = [
 name = "bodu-vm"
 version = "0.1.0"
 dependencies = [
+ "libloading",
  "rand",
  "regex",
  "tokio",

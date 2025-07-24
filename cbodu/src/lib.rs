@@ -1,6 +1,7 @@
 use std::{collections::HashMap, ffi::{c_char, c_void, CStr, CString}, sync::Arc};
 
-use bodu_vm::{make_container, op::{get, make_object, set, to_boolean_base, to_float_base, to_number_base, to_string_base}, Container, ObjectProp, StateContainer, Value};
+use bodu_vm::{make_container, op::{get, make_object, make_object_base, set, to_boolean_base, to_float_base, to_number_base, to_string_base}, Container, Function, ObjectProp, StateContainer, Value};
+use tokio::sync::Mutex;
 
 pub mod op;
 
@@ -503,5 +504,127 @@ pub extern "C" fn cbodu_obj_makegetset(state: *mut CBoduState, obj: u64, key: u6
     let i = state.i;
     state.i += 1;
     state.data.insert(i, CBoduVal::Val(make_container(Value::Null)));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_obj_getinternal(state: *mut CBoduState, obj: u64, i: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let obj = match state.data.get(&obj) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            let obj = &mut *obj.lock().await;
+            match obj {
+                Value::Object(obj) => {
+                    match obj.internals.get(&i) {
+                        None => tx.send(None).unwrap(),
+                        Some(v) => tx.send(Some(v.clone())).unwrap(),
+                    }
+                },
+                _ => tx.send(None).unwrap(),
+            }
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Some(v) => v,
+        None => make_container(Value::Null),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_obj_setinternal(state: *mut CBoduState, obj: u64, i: u64, val: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let obj = match state.data.get(&obj) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let val = match state.data.get(&val) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    {
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            let obj = &mut *obj.lock().await;
+            match obj {
+                Value::Object(obj) => {
+                    obj.internals.insert(i, val);
+                },
+                _ => {},
+            }
+            tx.send(()).unwrap()
+        });
+        rx.recv().unwrap();
+    }
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(make_container(Value::Null)));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_newfn(state: *mut CBoduState, f: CBoduFn) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let f = {
+        let mut internals = HashMap::new();
+        let mut obj = make_object_base();
+        obj.externals.insert(0, Arc::new(Mutex::new(Box::new(f))));
+        internals.insert(0, make_container(Value::Object(obj)));
+        Function {
+            internals,
+            state: state.state.clone(),
+            caller_state: true,
+            call: |state, args, gi| {
+                Box::pin(async move {
+                    let o = gi(0).unwrap();
+                    let o = (match o.lock().await.clone() {
+                        Value::Object(o) => Some(o),
+                        _ => None,
+                    }).unwrap();
+                    let o = o.externals.get(&0).unwrap().clone();
+                    let mut o = o.lock().await;
+                    let f = o.downcast_mut::<CBoduFn>().unwrap();
+                    let mut s = CBoduState {
+                        i: 0,
+                        data: HashMap::new(),
+                        ret: None,
+                        throw: None,
+                        gi: gi.clone(),
+                        state: state.clone(),
+                        args: args.clone(),
+                        strs: HashMap::new(),
+                    };
+                    unsafe {
+                        (*f)(&mut s as *mut CBoduState as *mut c_void);
+                    }
+                    match s.throw {
+                        Some(v) => Err(v.clone()),
+                        None => match s.ret {
+                            Some(v) => Ok(v.clone()),
+                            None => Ok(make_container(Value::Null)),
+                        },
+                    }
+                })
+            },
+        }
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(make_container(Value::Function(f))));
     i
 }

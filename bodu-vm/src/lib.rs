@@ -1,5 +1,6 @@
 use std::{any::Any, collections::HashMap, pin::Pin, sync::Arc};
 
+use libloading::Library;
 use tokio::{sync::Mutex, task::JoinHandle};
 
 pub mod op; // standard operations that bodu code can do
@@ -74,6 +75,8 @@ pub struct GlobalData {
     pub exitcode: u8,
     pub regex: HashMap<String, Result<regex::Regex, ()>>,
     pub gdefers: Vec<Container>,
+    pub libid: u64,
+    pub libs: HashMap<u64, Arc<Library>>,
 }
 
 // Container but for States

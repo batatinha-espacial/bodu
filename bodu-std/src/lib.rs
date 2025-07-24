@@ -83,6 +83,8 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
         exitcode: 0,
         regex: HashMap::new(),
         gdefers: Vec::new(),
+        libid: 0,
+        libs: HashMap::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s

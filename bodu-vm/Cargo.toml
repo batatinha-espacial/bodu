@@ -7,3 +7,4 @@ edition = "2024"
 rand = "0.9.2"
 regex = "1.11.1"
 tokio = { version = "1.46.1", features = ["full"] }
+libloading = "0.8.8"
