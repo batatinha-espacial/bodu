@@ -22,8 +22,13 @@ mod regex;
 mod string;
 
 macro_rules! make_function {
-    ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
+    ($state:expr, $scope:expr, $prop:expr, $fcall:expr, $gdprop:expr) => {{
         let f = make_fn!($state, $fcall);
+        {
+            let gd = &mut *$state.lock().await;
+            let gd = &mut *gd.globaldata.as_mut().unwrap().lock().await;
+            gd.register.insert($gdprop.to_string(), f.clone());
+        }
         set_base($state.clone(), $scope.clone(), $prop.to_string(), f).await.unwrap();
     }};
 }
@@ -44,8 +49,13 @@ macro_rules! make_fn {
 }
 
 macro_rules! make_function_true {
-    ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
+    ($state:expr, $scope:expr, $prop:expr, $fcall:expr, $gdprop:expr) => {{
         let f = make_fn_true!($state, $fcall);
+        {
+            let gd = &mut *$state.lock().await;
+            let gd = &mut *gd.globaldata.as_mut().unwrap().lock().await;
+            gd.register.insert($gdprop.to_string(), f.clone());
+        }
         set_base($state.clone(), $scope.clone(), $prop.to_string(), f).await.unwrap();
     }};
 }
@@ -85,6 +95,7 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
         gdefers: Vec::new(),
         libid: 0,
         libs: HashMap::new(),
+        register: HashMap::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s
@@ -92,176 +103,182 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
 
 pub async fn init_global_state(state: StateContainer) {
     let scope = state.lock().await.scope.clone();
-    make_function!(state, scope, "atob", atob);
+    make_function!(state, scope, "atob", atob, "atob");
     {
         let array_object = make_object();
-        make_function!(state, array_object, "is_array", array::is_array);
-        make_function!(state, array_object, "new", array::new);
+        make_function!(state, array_object, "is_array", array::is_array, "array.is_array");
+        make_function!(state, array_object, "new", array::new, "array.new");
         set_base(state.clone(), scope.clone(), "array".to_string(), array_object).await.unwrap();
     }
-    make_function_true!(state, scope, "async", async_);
-    make_function!(state, scope, "await", await_);
-    make_function_true!(state, scope, "awaitfn", awaitfn);
-    make_function!(state, scope, "bin", bin);
-    make_function!(state, scope, "boolean", boolean);
-    make_function!(state, scope, "btoa", btoa);
+    make_function_true!(state, scope, "async", async_, "async");
+    make_function!(state, scope, "await", await_, "await");
+    make_function_true!(state, scope, "awaitfn", awaitfn, "awaitfn");
+    make_function!(state, scope, "bin", bin, "bin");
+    make_function!(state, scope, "boolean", boolean, "boolean");
+    make_function!(state, scope, "btoa", btoa, "btoa");
     {
         let buffer_obj = make_object();
-        make_function!(state, buffer_obj, "from_string_utf8", buffer::from_string_utf8);
-        make_function!(state, buffer_obj, "from_string_utf16be", buffer::from_string_utf16be);
-        make_function!(state, buffer_obj, "from_string_utf16le", buffer::from_string_utf16le);
+        make_function!(state, buffer_obj, "from_string_utf8", buffer::from_string_utf8, "buffer.from_string_utf8");
+        make_function!(state, buffer_obj, "from_string_utf16be", buffer::from_string_utf16be, "buffer.from_string_utf16be");
+        make_function!(state, buffer_obj, "from_string_utf16le", buffer::from_string_utf16le, "from_string_utf16le");
         set_base(state.clone(), scope.clone(), "buffer".to_string(), buffer_obj).await.unwrap();
     }
-    make_function!(state, scope, "chr", chr);
-    make_function!(state, scope, "eprint", eprint);
+    make_function!(state, scope, "chr", chr, "chr");
+    make_function!(state, scope, "eprint", eprint, "eprint");
     {
         let event_obj = make_object();
-        make_function!(state, event_obj, "new", event::new);
+        make_function!(state, event_obj, "new", event::new, "event.new");
         set_base(state.clone(), scope.clone(), "event".to_string(), event_obj).await.unwrap();
     }
-    make_function!(state, scope, "exec", exec);
-    make_function!(state, scope, "float", float);
-    make_function!(state, scope, "from_bin", from_bin);
-    make_function!(state, scope, "from_hex", from_hex);
-    make_function!(state, scope, "from_oct", from_oct);
-    make_function!(state, scope, "hex", hex);
-    make_function!(state, scope, "hex_upper", hex_upper);
-    make_function!(state, scope, "id", id);
-    make_function!(state, scope, "input", input);
+    make_function!(state, scope, "exec", exec, "exec");
+    make_function!(state, scope, "float", float, "float");
+    make_function!(state, scope, "from_bin", from_bin, "from_bin");
+    make_function!(state, scope, "from_hex", from_hex, "from_hex");
+    make_function!(state, scope, "from_oct", from_oct, "from_oct");
+    make_function!(state, scope, "hex", hex, "hex");
+    make_function!(state, scope, "hex_upper", hex_upper, "hex_upper");
+    make_function!(state, scope, "id", id, "id");
+    make_function!(state, scope, "input", input, "input");
     {
         let iter_object = make_object();
-        make_function_true!(state, iter_object, "all", iter::all);
-        make_function_true!(state, iter_object, "any", iter::any);
-        make_function_true!(state, iter_object, "chain", iter::chain);
-        make_function_true!(state, iter_object, "collect", iter::collect);
-        make_function_true!(state, iter_object, "count", iter::count);
-        make_function_true!(state, iter_object, "cycle", iter::cycle);
-        make_function_true!(state, iter_object, "enumerate", iter::enumerate);
-        make_function_true!(state, iter_object, "filter", iter::filter);
-        make_function_true!(state, iter_object, "map", iter::map);
-        make_function_true!(state, iter_object, "reverse", iter::reverse);
+        make_function_true!(state, iter_object, "all", iter::all, "iter.all");
+        make_function_true!(state, iter_object, "any", iter::any, "iter.any");
+        make_function_true!(state, iter_object, "chain", iter::chain, "iter.chain");
+        make_function_true!(state, iter_object, "collect", iter::collect, "iter.collect");
+        make_function_true!(state, iter_object, "count", iter::count, "iter.count");
+        make_function_true!(state, iter_object, "cycle", iter::cycle, "iter.cycle");
+        make_function_true!(state, iter_object, "enumerate", iter::enumerate, "iter.enumerate");
+        make_function_true!(state, iter_object, "filter", iter::filter, "iter.filter");
+        make_function_true!(state, iter_object, "map", iter::map, "iter.map");
+        make_function_true!(state, iter_object, "reverse", iter::reverse, "iter.reverse");
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).await.unwrap();
     }
     {
         let json_obj = make_object();
-        make_function!(state, json_obj, "decode", json::decode);
-        make_function!(state, json_obj, "encode", json::encode);
+        make_function!(state, json_obj, "decode", json::decode, "json.decode");
+        make_function!(state, json_obj, "encode", json::encode, "json.encode");
         set_base(state.clone(), scope.clone(), "json".to_string(), json_obj).await.unwrap();
     }
-    make_function!(state, scope, "load", load);
-    make_function_true!(state, scope, "load_here", load_here);
+    make_function!(state, scope, "load", load, "load");
+    make_function_true!(state, scope, "load_here", load_here, "load_here");
     {
         let math_obj = make_object();
-        make_function!(state, math_obj, "abs", math::abs);
-        make_function!(state, math_obj, "acos", math::acos);
-        make_function!(state, math_obj, "acosh", math::acosh);
-        make_function!(state, math_obj, "asin", math::asin);
-        make_function!(state, math_obj, "asinh", math::asinh);
-        make_function!(state, math_obj, "atan", math::atan);
-        make_function!(state, math_obj, "atan2", math::atan2);
-        make_function!(state, math_obj, "atanh", math::atanh);
-        make_function!(state, math_obj, "cbrt", math::cbrt);
-        make_function!(state, math_obj, "ceil", math::ceil);
-        make_function!(state, math_obj, "copysign", math::copysign);
-        make_function!(state, math_obj, "cos", math::cos);
-        make_function!(state, math_obj, "cosh", math::cosh);
+        make_function!(state, math_obj, "abs", math::abs, "math.abs");
+        make_function!(state, math_obj, "acos", math::acos, "math.acos");
+        make_function!(state, math_obj, "acosh", math::acosh, "math.acosh");
+        make_function!(state, math_obj, "asin", math::asin, "math.asin");
+        make_function!(state, math_obj, "asinh", math::asinh, "math.asinh");
+        make_function!(state, math_obj, "atan", math::atan, "math.atan");
+        make_function!(state, math_obj, "atan2", math::atan2, "math.atan2");
+        make_function!(state, math_obj, "atanh", math::atanh, "math.atanh");
+        make_function!(state, math_obj, "cbrt", math::cbrt, "math.cbrt");
+        make_function!(state, math_obj, "ceil", math::ceil, "math.ceil");
+        make_function!(state, math_obj, "copysign", math::copysign, "math.copysign");
+        make_function!(state, math_obj, "cos", math::cos, "math.cos");
+        make_function!(state, math_obj, "cosh", math::cosh, "math.cosh");
         set_base(state.clone(), math_obj.clone(), "epsilon".to_string(), make_container(Value::Float(f64::EPSILON))).await.unwrap();
-        make_function!(state, math_obj, "exp", math::exp);
-        make_function!(state, math_obj, "exp2", math::exp2);
-        make_function!(state, math_obj, "exp_m1", math::exp_m1);
-        make_function!(state, math_obj, "floor", math::floor);
-        make_function!(state, math_obj, "fract", math::fract);
-        make_function!(state, math_obj, "hypot", math::hypot);
+        make_function!(state, math_obj, "exp", math::exp, "math.exp");
+        make_function!(state, math_obj, "exp2", math::exp2, "math.exp2");
+        make_function!(state, math_obj, "exp_m1", math::exp_m1, "math.exp_m1");
+        make_function!(state, math_obj, "floor", math::floor, "math.floor");
+        make_function!(state, math_obj, "fract", math::fract, "math.fract");
+        make_function!(state, math_obj, "hypot", math::hypot, "math.hypot");
         set_base(state.clone(), math_obj.clone(), "inf".to_string(), make_container(Value::Float(f64::INFINITY))).await.unwrap();
-        make_function!(state, math_obj, "is_finite", math::is_finite);
-        make_function!(state, math_obj, "is_infinite", math::is_infinite);
-        make_function!(state, math_obj, "is_nan", math::is_nan);
-        make_function!(state, math_obj, "is_normal", math::is_normal);
-        make_function!(state, math_obj, "is_sign_negative", math::is_sign_negative);
-        make_function!(state, math_obj, "is_sign_positive", math::is_sign_positive);
-        make_function!(state, math_obj, "is_subnormal", math::is_subnormal);
-        make_function!(state, math_obj, "ln", math::ln);
-        make_function!(state, math_obj, "ln_1p", math::ln_1p);
-        make_function!(state, math_obj, "log", math::log);
-        make_function!(state, math_obj, "log2", math::log2);
-        make_function!(state, math_obj, "log10", math::log10);
+        make_function!(state, math_obj, "is_finite", math::is_finite, "math.is_finite");
+        make_function!(state, math_obj, "is_infinite", math::is_infinite, "math.is_infinite");
+        make_function!(state, math_obj, "is_nan", math::is_nan, "math.is_nan");
+        make_function!(state, math_obj, "is_normal", math::is_normal, "math.is_normal");
+        make_function!(state, math_obj, "is_sign_negative", math::is_sign_negative, "math.is_sign_negative");
+        make_function!(state, math_obj, "is_sign_positive", math::is_sign_positive, "math.is_sign_positive");
+        make_function!(state, math_obj, "is_subnormal", math::is_subnormal, "math.is_subnormal");
+        make_function!(state, math_obj, "ln", math::ln, "math.ln");
+        make_function!(state, math_obj, "ln_1p", math::ln_1p, "math.ln_1p");
+        make_function!(state, math_obj, "log", math::log, "math.log");
+        make_function!(state, math_obj, "log2", math::log2, "math.log2");
+        make_function!(state, math_obj, "log10", math::log10, "math.log10");
         set_base(state.clone(), math_obj.clone(), "max".to_string(), make_container(Value::Float(f64::MAX))).await.unwrap();
         set_base(state.clone(), math_obj.clone(), "min".to_string(), make_container(Value::Float(f64::MIN))).await.unwrap();
         set_base(state.clone(), math_obj.clone(), "min_positive".to_string(), make_container(Value::Float(f64::MIN_POSITIVE))).await.unwrap();
         set_base(state.clone(), math_obj.clone(), "nan".to_string(), make_container(Value::Float(f64::NAN))).await.unwrap();
         set_base(state.clone(), math_obj.clone(), "neg_inf".to_string(), make_container(Value::Float(f64::NEG_INFINITY))).await.unwrap();
-        make_function!(state, math_obj, "next_down", math::next_down);
-        make_function!(state, math_obj, "next_up", math::next_up);
-        make_function!(state, math_obj, "pow", math::pow);
-        make_function!(state, math_obj, "recip", math::recip);
-        make_function!(state, math_obj, "round", math::round);
-        make_function!(state, math_obj, "round_ties_even", math::round_ties_even);
-        make_function!(state, math_obj, "signum", math::signum);
-        make_function!(state, math_obj, "sin", math::sin);
-        make_function!(state, math_obj, "sinh", math::sinh);
-        make_function!(state, math_obj, "sqrt", math::sqrt);
-        make_function!(state, math_obj, "tan", math::tan);
-        make_function!(state, math_obj, "tanh", math::tanh);
-        make_function!(state, math_obj, "to_degrees", math::to_degrees);
-        make_function!(state, math_obj, "to_radians", math::to_radians);
-        make_function!(state, math_obj, "trunc", math::trunc);
+        make_function!(state, math_obj, "next_down", math::next_down, "math.next_down");
+        make_function!(state, math_obj, "next_up", math::next_up, "math.next_up");
+        make_function!(state, math_obj, "pow", math::pow, "math.pow");
+        make_function!(state, math_obj, "recip", math::recip, "math.recip");
+        make_function!(state, math_obj, "round", math::round, "math.round");
+        make_function!(state, math_obj, "round_ties_even", math::round_ties_even, "math.round_ties_even");
+        make_function!(state, math_obj, "signum", math::signum, "math.signum");
+        make_function!(state, math_obj, "sin", math::sin, "math.sin");
+        make_function!(state, math_obj, "sinh", math::sinh, "math.sinh");
+        make_function!(state, math_obj, "sqrt", math::sqrt, "math.sqrt");
+        make_function!(state, math_obj, "tan", math::tan, "math.tan");
+        make_function!(state, math_obj, "tanh", math::tanh, "math.tanh");
+        make_function!(state, math_obj, "to_degrees", math::to_degrees, "math.to_degrees");
+        make_function!(state, math_obj, "to_radians", math::to_radians, "math.to_radian");
+        make_function!(state, math_obj, "trunc", math::trunc, "math.trunc");
         set_base(state.clone(), scope.clone(), "math".to_string(), math_obj).await.unwrap();
     }
-    make_function!(state, scope, "number", number);
+    make_function!(state, scope, "number", number, "number");
     {
         let obj_obj = make_object();
-        make_function!(state, obj_obj, "new", object::new);
+        make_function!(state, obj_obj, "new", object::new, "object.new");
         set_base(state.clone(), scope.clone(), "object".to_string(), obj_obj).await.unwrap();
     }
-    make_function!(state, scope, "oct", oct);
-    make_function!(state, scope, "ord", ord);
+    make_function!(state, scope, "oct", oct, "oct");
+    make_function!(state, scope, "ord", ord, "ord");
     {
         let os_object = make_object();
-        make_function!(state, os_object, "name", os::name);
+        make_function!(state, os_object, "name", os::name, "os.name");
         set_base(state.clone(), scope.clone(), "os".to_string(), os_object).await.unwrap();
     }
-    make_function!(state, scope, "print", print);
-    make_function!(state, scope, "push_gdefer", push_gdefer);
-    make_function!(state, scope, "range", range);
+    make_function!(state, scope, "print", print, "print");
+    make_function!(state, scope, "push_gdefer", push_gdefer, "push_gdefer");
+    make_function!(state, scope, "range", range, "range");
     {
         let readline_obj = make_object();
-        make_function!(state, readline_obj, "new", readline::new);
+        make_function!(state, readline_obj, "new", readline::new, "readline.new");
         set_base(state.clone(), scope.clone(), "readline".to_string(), readline_obj).await.unwrap();
     }
     {
         let regex_obj = make_object();
-        make_function!(state, regex_obj, "captures", regex::captures);
-        make_function!(state, regex_obj, "captures_many", regex::captures_many);
-        make_function!(state, regex_obj, "find", regex::find);
-        make_function!(state, regex_obj, "find_many", regex::find_many);
-        make_function!(state, regex_obj, "is_match", regex::is_match);
-        make_function!(state, regex_obj, "replace", regex::replace);
-        make_function!(state, regex_obj, "replace_all", regex::replace_all);
-        make_function!(state, regex_obj, "replacen", regex::replacen);
-        make_function!(state, regex_obj, "split", regex::split);
-        make_function!(state, regex_obj, "splitn", regex::splitn);
+        make_function!(state, regex_obj, "captures", regex::captures, "regex.captures");
+        make_function!(state, regex_obj, "captures_many", regex::captures_many, "regex.captures_many");
+        make_function!(state, regex_obj, "find", regex::find, "regex.find");
+        make_function!(state, regex_obj, "find_many", regex::find_many, "regex.find_many");
+        make_function!(state, regex_obj, "is_match", regex::is_match, "regex.is_match");
+        make_function!(state, regex_obj, "replace", regex::replace, "regex.replace");
+        make_function!(state, regex_obj, "replace_all", regex::replace_all, "regex.replace_all");
+        make_function!(state, regex_obj, "replacen", regex::replacen, "regex.replacen");
+        make_function!(state, regex_obj, "split", regex::split, "regex.split");
+        make_function!(state, regex_obj, "splitn", regex::splitn, "regex.splitn");
         set_base(state.clone(), scope.clone(), "regex".to_string(), regex_obj).await.unwrap();
     }
-    make_function!(state, scope, "sleep", sleep);
-    make_function!(state, scope, "stderr", stderr);
-    make_function!(state, scope, "stdout", stdout);
+    make_function!(state, scope, "sleep", sleep, "sleep");
+    make_function!(state, scope, "stderr", stderr, "stderr");
+    make_function!(state, scope, "stdout", stdout, "stdout");
     {
         let string_obj = {
             let mut obj = make_object_base();
             let metaobj = make_object();
-            set_base(state.clone(), metaobj.clone(), "call".to_string(), make_fn!(state, string)).await.unwrap();
+            let f = make_fn!(state, string);
+            {
+                let gd = &mut *state.lock().await;
+                let gd = &mut *gd.globaldata.as_mut().unwrap().lock().await;
+                gd.register.insert("string".to_string(), f.clone());
+            }
+            set_base(state.clone(), metaobj.clone(), "call".to_string(), f).await.unwrap();
             obj.metaobj = metaobj;
             make_container(Value::Object(obj))
         };
-        make_function!(state, string_obj, "chars", string::chars);
-        make_function!(state, string_obj, "count_chars", string::count_chars);
-        make_function!(state, string_obj, "len", string::len);
-        make_function!(state, string_obj, "ords", string::ords);
-        make_function!(state, string_obj, "reverse", string::reverse);
-        make_function!(state, string_obj, "trim", string::trim);
+        make_function!(state, string_obj, "chars", string::chars, "string.chars");
+        make_function!(state, string_obj, "count_chars", string::count_chars, "string.count_chars");
+        make_function!(state, string_obj, "len", string::len, "string.len");
+        make_function!(state, string_obj, "ords", string::ords, "string.ords");
+        make_function!(state, string_obj, "reverse", string::reverse, "string.reverse");
+        make_function!(state, string_obj, "trim", string::trim, "string.trim");
         set_base(state.clone(), scope.clone(), "string".to_string(), string_obj).await.unwrap();
     }
-    make_function!(state, scope, "type", type_);
+    make_function!(state, scope, "type", type_, "type");
 }
 
 async fn print(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {

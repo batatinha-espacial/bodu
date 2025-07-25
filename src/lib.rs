@@ -6,6 +6,11 @@ use cbodu::op::load_lib;
 macro_rules! make_function_true {
     ($state:expr, $scope:expr, $prop:expr, $fcall:expr) => {{
         let f = make_fn_true!($state, $fcall);
+        {
+            let gd = &mut *$state.lock().await;
+            let gd = &mut *gd.globaldata.as_mut().unwrap().lock().await;
+            gd.register.insert($prop.to_string(), f.clone());
+        }
         set_base($state.clone(), $scope.clone(), $prop.to_string(), f).await.unwrap();
     }};
 }

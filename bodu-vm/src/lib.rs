@@ -77,6 +77,7 @@ pub struct GlobalData {
     pub gdefers: Vec<Container>,
     pub libid: u64,
     pub libs: HashMap<u64, Arc<Library>>,
+    pub register: HashMap<String, Container>,
 }
 
 // Container but for States
