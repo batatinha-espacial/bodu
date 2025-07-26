@@ -84,6 +84,10 @@ Takes `s` (a string) and converts it into a function that when called runs the s
 
 Does the same as `load`, but it gives the code access to the current scope.
 
+## `load_lib(path)`
+
+Loads a native bodu library located in `path` (a string).
+
 ## `number(v)`
 
 Converts `v` (any value) to a number, throwing an error if not possible.

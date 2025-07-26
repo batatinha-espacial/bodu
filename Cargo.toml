@@ -11,7 +11,4 @@ bodu-vm = { path = "./bodu-vm" }
 bodu-script = { path = "./bodu-script" }
 bodu-std = { path = "./bodu-std" }
 cbodu = { path = "./cbodu" }
-
-[features]
-default = ["extensions"]
-extensions = []
+bodu-compiler = { path = "./bodu-compiler" }

@@ -1,5 +1,6 @@
 use bodu_vm::op::{get_base, make_function, new_state, to_boolean_base};
 pub use bodu_vm as vm;
+use cbodu::op::load_lib;
 
 use std::{collections::HashMap, io::Write, sync::Arc};
 
@@ -161,6 +162,7 @@ pub async fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "load", load, "load");
     make_function_true!(state, scope, "load_here", load_here, "load_here");
+    make_function_true!(state, scope, "load_lib", load_lib_, "load_lib");
     {
         let math_obj = make_object();
         make_function!(state, math_obj, "abs", math::abs, "math.abs");
@@ -779,4 +781,13 @@ async fn push_gdefer(state: StateContainer, args: Vec<Container>, _: Gi) -> Resu
         threads.gdefers.push(args[0].clone());
     }
     Ok(make_container(Value::Null))
+}
+
+pub async fn load_lib_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("load_lib requires 1 argument"));
+    }
+    let a = to_string_base(state.clone(), args[0].clone()).await?;
+    let f = load_lib(state.clone(), a).await?;
+    Ok(f)
 }

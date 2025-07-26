@@ -6,6 +6,4 @@ edition = "2024"
 [dependencies]
 tokio = { version = "1.46.1", features = ["full"] }
 bodu-vm = { path = "../bodu-vm" }
-bodu-script = { path = "../bodu-script" }
-bodu-std = { path = "../bodu-std" }
 libloading = "0.8.8"
