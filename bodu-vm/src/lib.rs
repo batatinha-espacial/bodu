@@ -182,4 +182,5 @@ pub enum Operator {
     Property, // .
     Tuple, // ,
     Pipe, // |>
+    IsntNull, // ?
 }

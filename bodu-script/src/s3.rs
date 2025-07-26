@@ -225,6 +225,10 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
             *i += 1;
             Some((S3T::OperatorFn(Operator::Pipe), 1))
         },
+        Some(S2T::IsntNullFn) => {
+            *i += 1;
+            Some((S3T::OperatorFn(Operator::IsntNull), 1))
+        },
         Some(S2T::OpenParen) => {
             let mut n = 0;
             *i += 1;

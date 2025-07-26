@@ -135,6 +135,7 @@ These are the functional counterpart of operators. They are expressed by wrappin
 - `[.]`: property access (2 arguments or more)
 - `[,]`: tuple (at least 1 argument)
 - `[|>]`: pipe (2 arguments or more)
+- `[?]`: `?` operator (1 argument)
 
 # Alternative Writing
 

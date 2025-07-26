@@ -1233,6 +1233,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                     Operator::Property => make_fn!(state, opfn::property),
                     Operator::Tuple => make_fn!(state, opfn::tuple),
                     Operator::Pipe => make_fn!(state, opfn::pipe),
+                    Operator::IsntNull => make_fn!(state, opfn::isnt_null_),
                 };
                 set_var(state.clone(), tmps, res, f).await?;
             },

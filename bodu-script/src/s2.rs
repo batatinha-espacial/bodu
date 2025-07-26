@@ -100,6 +100,7 @@ pub enum S2T {
     Break, // break
     Probably, // probably
     Possibly, // possibly
+    IsntNullFn, // [?]
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -413,25 +414,43 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
                             continue;
                         },
                         S2T::Question => {
-                            if let Some(_) = iterr.next_if(|t| {
+                            if let Some(t) = iterr.next_if(|t| {
                                 match t {
                                     S2T::Colon => true,
+                                    S2T::Question => true,
+                                    S2T::CloseBrack => true,
                                     _ => false,
                                 }
                             }) {
-                                if let Some(_) = iterr.next_if(|t| {
-                                    match t {
-                                        S2T::CloseBrack => true,
-                                        _ => false,
-                                    }
-                                }) {
-                                    res.push(S2T::TernaryFn);
-                                    continue;
+                                match t {
+                                    S2T::Colon => {
+                                        if let Some(S2T::CloseBrack) = iterr.peek() {
+                                            iterr.next();
+                                            res.push(S2T::TernaryFn);
+                                            continue;
+                                        }
+                                        res.push(S2T::OpenBrack);
+                                        res.push(S2T::Question);
+                                        res.push(S2T::Colon);
+                                        continue;
+                                    },
+                                    S2T::Question => {
+                                        if let Some(S2T::CloseBrack) = iterr.peek() {
+                                            iterr.next();
+                                            res.push(S2T::OrThatFn);
+                                            continue;
+                                        }
+                                        res.push(S2T::OpenBrack);
+                                        res.push(S2T::Question);
+                                        res.push(S2T::Question);
+                                        continue;
+                                    },
+                                    S2T::CloseBrack => {
+                                        res.push(S2T::IsntNullFn);
+                                        continue;
+                                    },
+                                    _ => {}, // should never happen
                                 }
-                                res.push(S2T::OpenBrack);
-                                res.push(S2T::Question);
-                                res.push(S2T::Colon);
-                                continue;
                             }
                             res.push(S2T::OpenBrack);
                             res.push(S2T::Question);
