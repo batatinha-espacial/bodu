@@ -59,6 +59,7 @@ pub enum S3T {
     Break(Option<Box<S3T>>),
     Probably, // probably
     Possibly, // possibly
+    IsntNull(Box<S3T>), // ?expr
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -410,6 +411,7 @@ enum UnaryOp {
     None,
     Negate,
     Not,
+    IsntNull,
 }
 
 fn unary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
@@ -425,15 +427,30 @@ fn unary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
             n += 1;
             UnaryOp::Not
         },
+        Some(S2T::Question) => {
+            *i += 1;
+            n += 1;
+            UnaryOp::IsntNull
+        },
         _ => UnaryOp::None,
     };
-    match fn_call(input, i) {
+    if let UnaryOp::None = op {
+        return match fn_call(input, i) {
+            Some((v, nn)) => {
+                n += nn;
+                Some((v, n))
+            },
+            _ => None,
+        };
+    }
+    match unary(input, i) {
         Some((v, nn)) => {
             n += nn;
             let v = match op {
-                UnaryOp::None => v,
+                UnaryOp::None => v, // should never happen
                 UnaryOp::Negate => S3T::Negate(Box::new(v)),
                 UnaryOp::Not => S3T::Not(Box::new(v)),
+                UnaryOp::IsntNull => S3T::IsntNull(Box::new(v)),
             };
             Some((v, n))
         },

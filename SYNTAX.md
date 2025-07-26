@@ -102,6 +102,7 @@ expr >= expr; // greater than or equal
 expr & expr; // and
 expr | expr; // or
 expr ^ expr; // xor
+?expr; // expr != null
 expr |> expr; // pipe (explained later)
 $; // shorthand (explained later)
 (expr);

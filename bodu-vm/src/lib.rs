@@ -135,6 +135,7 @@ pub enum Instruction {
     Iterate(VarIndex, VarIndex, VarIndex), // r1, r2, it
     Probably(VarIndex), // result
     Possibly(VarIndex), // result
+    IsntNull(VarIndex, VarIndex), // result, op
 }
 
 #[derive(Clone, Debug)]

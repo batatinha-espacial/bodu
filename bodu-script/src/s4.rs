@@ -83,6 +83,7 @@ fn expr(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Loop(v1, v2, v3, v4, v5, v6) => loop_((v1, v2, v3, v4, v5, v6), res, tempi, labeli, outi, outli, conti, contli, breaki, breakli),
         S3T::Probably => probably(res, tempi),
         S3T::Possibly => possibly(res, tempi),
+        S3T::IsntNull(v) => isnt_null(v, res, tempi, labeli, outi, outli, conti, contli, breaki, breakli),
         _ => Err("invalid expression".to_string()),
     }
 }
@@ -660,6 +661,7 @@ fn includes_fnshorthand(v: Box<S3T>) -> bool {
             }
             b
         },
+        S3T::IsntNull(v) => includes_fnshorthand(v),
         _ => false,
     }
 }
@@ -931,4 +933,12 @@ fn possibly(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, Str
     *tempi += 1;
     res.push(Instruction::Possibly(VarIndex::Temp(r)));
     Ok(VarIndex::Temp(r))
+}
+
+fn isnt_null(v: Box<S3T>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, outi: u64, outli: u64, conti: u64, contli: u64, breaki: u64, breakli: u64) -> Result<VarIndex, String> {
+    let v = expr(*v, res, tempi, labeli, outi, outli, conti, contli, breaki, breakli)?;
+    let vi = *tempi;
+    *tempi += 1;
+    res.push(Instruction::IsntNull(VarIndex::Temp(vi), v));
+    Ok(VarIndex::Temp(vi))
 }
