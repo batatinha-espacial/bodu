@@ -50,7 +50,7 @@ fn expr(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Number(a) => number(a, res, tempi),
         S3T::Float(a) => float(a, res, tempi),
         S3T::String(a) => string(a, res, tempi),
-        S3T::TryCatchFinally(a, b, c, d) => try_catch_finally(a, b, c, d, res, tempi, labeli, conti, contli, breaki, breakli),
+        S3T::TryCatchFinally(a, b, c) => try_catch_finally(a, b, c, res, tempi, labeli, conti, contli, breaki, breakli),
         S3T::Function(_, b, c) => fn_(b, c, res, tempi),
         S3T::Plus(a, b) => plus(a, b, res, tempi, labeli, outi, outli, conti, contli, breaki, breakli),
         S3T::Minus(a, b) => minus(a, b, res, tempi, labeli, outi, outli, conti, contli, breaki, breakli),
@@ -81,6 +81,8 @@ fn expr(v: S3T, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, o
         S3T::Release => release(res, tempi),
         S3T::Maybe => maybe(res, tempi),
         S3T::Loop(v1, v2, v3, v4, v5, v6) => loop_((v1, v2, v3, v4, v5, v6), res, tempi, labeli, outi, outli, conti, contli, breaki, breakli),
+        S3T::Probably => probably(res, tempi),
+        S3T::Possibly => possibly(res, tempi),
         _ => Err("invalid expression".to_string()),
     }
 }
@@ -217,7 +219,7 @@ fn string(v: String, res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarI
     Ok(VarIndex::Temp(i))
 }
 
-fn try_catch_finally(try_body: Vec<S3T>, name: String, catch_body: Vec<S3T>, finally_body: Option<Vec<S3T>>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, conti: u64, contli: u64, breaki: u64, breakli: u64) -> Result<VarIndex, String> {
+fn try_catch_finally(try_body: Vec<S3T>, name: String, catch_body: Vec<S3T>, res: &mut Vec<Instruction>, tempi: &mut u64, labeli: &mut u64, conti: u64, contli: u64, breaki: u64, breakli: u64) -> Result<VarIndex, String> {
     let outli = *labeli;
     *labeli += 1;
     let outi = *tempi;
@@ -228,21 +230,13 @@ fn try_catch_finally(try_body: Vec<S3T>, name: String, catch_body: Vec<S3T>, fin
     *tempi += 1;
     let catchli = *labeli;
     *labeli += 1;
-    let finallyli = match finally_body {
-        Some(_) => {
-            let fli = *labeli;
-            *labeli += 1;
-            fli
-        },
-        None => outli,
-    };
     let mut try_vec = Vec::new();
     for i in try_body {
-        stat(i, &mut try_vec, tempi, labeli, outi, finallyli, conti, contli, breaki, breakli)?;
+        stat(i, &mut try_vec, tempi, labeli, outi, outli, conti, contli, breaki, breakli)?;
     }
     res.push(Instruction::Catch(VarIndex::Temp(is_err), VarIndex::Temp(err), try_vec));
     res.push(Instruction::GotoIf(Label::Unnamed(catchli), VarIndex::Temp(is_err)));
-    res.push(Instruction::Goto(Label::Unnamed(finallyli)));
+    res.push(Instruction::Goto(Label::Unnamed(outli)));
     res.push(Instruction::Label(Label::Unnamed(catchli)));
     let mut catch_vec = vec![Instruction::Decl(VarIndex::Ident(name.clone())), Instruction::Assign(VarIndex::Ident(name.clone()), VarIndex::Temp(err))];
     for i in catch_body {
@@ -250,18 +244,6 @@ fn try_catch_finally(try_body: Vec<S3T>, name: String, catch_body: Vec<S3T>, fin
     }
     res.push(Instruction::Block(catch_vec));
     res.push(Instruction::Goto(Label::Unnamed(outli)));
-    match finally_body {
-        None => {},
-        Some(finally_body) => {
-            res.push(Instruction::Label(Label::Unnamed(finallyli)));
-            let mut finally_vec = Vec::new();
-            for i in finally_body {
-                stat(i, &mut finally_vec, tempi, labeli, outi, outli, conti, contli, breaki, breakli)?;
-            }
-            res.push(Instruction::Block(finally_vec));
-            res.push(Instruction::Goto(Label::Unnamed(outli)));
-        },
-    }
     res.push(Instruction::Label(Label::Unnamed(outli)));
     Ok(VarIndex::Temp(outi))
 }
@@ -606,18 +588,13 @@ fn includes_fnshorthand(v: Box<S3T>) -> bool {
             b
         },
         S3T::Out(v) => includes_fnshorthand(v),
-        S3T::TryCatchFinally(v1, _, v2, v3) => {
+        S3T::TryCatchFinally(v1, _, v2) => {
             let mut b = false;
             for i in v1 {
                 b = b || includes_fnshorthand(Box::new(i));
             }
             for i in v2 {
                 b = b || includes_fnshorthand(Box::new(i));
-            }
-            if let Some(v3) = v3 {
-                for i in v3 {
-                    b = b || includes_fnshorthand(Box::new(i));
-                }
             }
             b
         },
@@ -940,4 +917,18 @@ fn loop_(v: (Vec<S3T>, LoopType, Vec<S3T>, Vec<S3T>, Vec<S3T>, Vec<S3T>), res: &
     vec_.push(Instruction::Label(Label::Unnamed(outli2)));
     res.push(Instruction::Block(vec_));
     Ok(VarIndex::Temp(outi2))
+}
+
+fn probably(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    res.push(Instruction::Probably(VarIndex::Temp(r)));
+    Ok(VarIndex::Temp(r))
+}
+
+fn possibly(res: &mut Vec<Instruction>, tempi: &mut u64) -> Result<VarIndex, String> {
+    let r = *tempi;
+    *tempi += 1;
+    res.push(Instruction::Possibly(VarIndex::Temp(r)));
+    Ok(VarIndex::Temp(r))
 }

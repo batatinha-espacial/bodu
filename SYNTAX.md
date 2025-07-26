@@ -33,7 +33,6 @@ The current escape sequences are:
 - `catch`
 - `return`
 - `throw`
-- `finally`
 - `loop`
 - `while`
 - `until`
@@ -52,6 +51,8 @@ The current escape sequences are:
 - `after`
 - `continue`
 - `break`
+- `possibly`
+- `probably`
 
 # Identifiers
 
@@ -80,6 +81,8 @@ null;
 debug; // true if in debug mode, false otherwise
 release; // !debug
 maybe; // 50% chance of true, 50% chance of false
+possibly; // 2/3 chance of true, 1/3 chance of false
+probably; // 75% chance of true, 25% chance of false
 
 expr + expr; // addition
 expr - expr; // subtraction
@@ -153,8 +156,6 @@ try {
     // statements
 } catch name {
     // if an error happened
-} finally {
-    // if no errors happened
 }
 
 // loops

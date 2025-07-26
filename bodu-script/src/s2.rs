@@ -24,7 +24,6 @@ pub enum S2T {
     Catch, // catch
     Return, // return
     Throw, // throw
-    Finally, // finally
     Loop, // loop
     While, // while
     Until, // until
@@ -99,6 +98,8 @@ pub enum S2T {
     After, // after
     Continue, // continue
     Break, // break
+    Probably, // probably
+    Possibly, // possibly
 }
 
 pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
@@ -141,7 +142,6 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordCatch => res.push(S2T::Catch),
             S1T::KeywordReturn => res.push(S2T::Return),
             S1T::KeywordThrow => res.push(S2T::Throw),
-            S1T::KeywordFinally => res.push(S2T::Finally),
             S1T::KeywordLoop => res.push(S2T::Loop),
             S1T::KeywordWhile => res.push(S2T::While),
             S1T::KeywordUntil => res.push(S2T::Until),
@@ -356,6 +356,8 @@ pub fn s2(s1: Vec<S1T>) -> Result<Vec<S2T>, String> {
             S1T::KeywordAfter => res.push(S2T::After),
             S1T::KeywordContinue => res.push(S2T::Continue),
             S1T::KeywordBreak => res.push(S2T::Break),
+            S1T::KeywordProbably => res.push(S2T::Probably),
+            S1T::KeywordPossibly => res.push(S2T::Possibly),
         }
     }
     let s2 = res;

@@ -14,7 +14,7 @@ pub enum S3T {
     Number(i64),
     Float(f64),
     String(String),
-    TryCatchFinally(Vec<S3T>, String, Vec<S3T>, Option<Vec<S3T>>), // try, catch, finally: try { ... } catch name { ... } finally { ... }
+    TryCatchFinally(Vec<S3T>, String, Vec<S3T>), // try, catch, finally: try { ... } catch name { ... }
     Return(Box<S3T>), // return: expr
     Throw(Box<S3T>), // throw: expr
     Defer(Vec<S3T>), // defer: { ... }
@@ -57,6 +57,8 @@ pub enum S3T {
     Loop(Vec<S3T>, LoopType, Vec<S3T>, Vec<S3T>, Vec<S3T>, Vec<S3T>),
     Continue(Option<Box<S3T>>),
     Break(Option<Box<S3T>>),
+    Probably, // probably
+    Possibly, // possibly
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -133,6 +135,14 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         Some(S2T::Maybe) => {
             *i += 1;
             Some((S3T::Maybe, 1))
+        },
+        Some(S2T::Probably) => {
+            *i += 1;
+            Some((S3T::Probably, 1))
+        },
+        Some(S2T::Possibly) => {
+            *i += 1;
+            Some((S3T::Possibly, 1))
         },
         Some(S2T::PlusFn) => {
             *i += 1;
@@ -1789,44 +1799,7 @@ fn stat_expr(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                         return None;
                     },
                 };
-                let finally = match input.get(*i) {
-                    Some(S2T::Finally) => {
-                        *i += 1;
-                        n += 1;
-                        match input.get(*i) {
-                            Some(S2T::OpenBrace) => {
-                                *i += 1;
-                                n += 1;
-                                match stat_list(input, i) {
-                                    Some((v, nn)) => {
-                                        n += nn;
-                                        match input.get(*i) {
-                                            Some(S2T::CloseBrace) => {
-                                                *i += 1;
-                                                n += 1;
-                                                Some(v)
-                                            },
-                                            _ => {
-                                                *i -= n;
-                                                return None;
-                                            },
-                                        }
-                                    },
-                                    _ => {
-                                        *i -= n;
-                                        return None;
-                                    },
-                                }
-                            },
-                            _ => {
-                                *i -= n;
-                                return None;
-                            },
-                        }
-                    },
-                    _ => None,
-                };
-                Some((S3T::TryCatchFinally(try_, catch.0, catch.1, finally), n))
+                Some((S3T::TryCatchFinally(try_, catch.0, catch.1), n))
             },
             _ => None,
         },

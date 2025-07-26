@@ -1264,6 +1264,25 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                     set_var(state.clone(), tmps, r1, make_container(Value::Boolean(false))).await?;
                 }
             },
+            Instruction::Probably(res) => {
+                let probably = match rand::rng().random_range(0..4) {
+                    0 => true,
+                    1 => true,
+                    2 => true,
+                    4 => false,
+                    _ => false, // should never happen
+                };
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(probably))).await?;
+            },
+            Instruction::Possibly(res) => {
+                let probably: bool = match rand::rng().random_range(0..3) {
+                    0 => true,
+                    1 => true,
+                    2 => false,
+                    _ => false, // should never happen
+                };
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(probably))).await?;
+            },
         }
         i += 1;
     }
