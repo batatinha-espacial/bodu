@@ -112,6 +112,30 @@ f(args); // function call
 (expr, expr, expr); // tuple
 ```
 
+# Operator Functions
+
+These are the functional counterpart of operators. They are expressed by wrapping the operator in brackets. Here is a list of them:
+- `[+]`: addition (2 arguments or more)
+- `[-]`: negation (1 argument), subtraction (2 arguments)
+- `[*]`: multiplication (2 arguments or more)
+- `[/]`: division (2 arguments)
+- `[%]`: modulus (2 arguments)
+- `[??]`: `??` operator (2 arguments or more)
+- `[?:]`: ternary operator (3 arguments)
+- `[==]`: equal to (2 arguments)
+- `[!]`: not (1 argument)
+- `[!=]`: not equal to (2 arguments)
+- `[<]`: less than (2 arguments)
+- `[<=]`: less than or equal (2 arguments)
+- `[>]`: greater than (2 arguments)
+- `[>=]`: greater than or equal (2 arguments)
+- `[&]`: and (2 arguments or more)
+- `[|]`: or (2 arguments or more)
+- `[^]`: xor (2 arguments)
+- `[.]`: property access (2 arguments or more)
+- `[,]`: tuple (at least 1 argument)
+- `[|>]`: pipe (2 arguments or more)
+
 # Alternative Writing
 
 Some keywords and operators have alternative ways to write them.
