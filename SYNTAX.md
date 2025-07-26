@@ -33,7 +33,6 @@ The current escape sequences are:
 - `catch`
 - `return`
 - `throw`
-- `finally`
 - `loop`
 - `while`
 - `until`
@@ -52,6 +51,8 @@ The current escape sequences are:
 - `after`
 - `continue`
 - `break`
+- `possibly`
+- `probably`
 
 # Identifiers
 
@@ -80,6 +81,8 @@ null;
 debug; // true if in debug mode, false otherwise
 release; // !debug
 maybe; // 50% chance of true, 50% chance of false
+possibly; // 2/3 chance of true, 1/3 chance of false
+probably; // 75% chance of true, 25% chance of false
 
 expr + expr; // addition
 expr - expr; // subtraction
@@ -99,6 +102,7 @@ expr >= expr; // greater than or equal
 expr & expr; // and
 expr | expr; // or
 expr ^ expr; // xor
+?expr; // expr != null
 expr |> expr; // pipe (explained later)
 $; // shorthand (explained later)
 (expr);
@@ -107,6 +111,31 @@ expr.name; // property access
 f(args); // function call
 (expr, expr, expr); // tuple
 ```
+
+# Operator Functions
+
+These are the functional counterpart of operators. They are expressed by wrapping the operator in brackets. Here is a list of them:
+- `[+]`: addition (2 arguments or more)
+- `[-]`: negation (1 argument), subtraction (2 arguments)
+- `[*]`: multiplication (2 arguments or more)
+- `[/]`: division (2 arguments)
+- `[%]`: modulus (2 arguments)
+- `[??]`: `??` operator (2 arguments or more)
+- `[?:]`: ternary operator (3 arguments)
+- `[==]`: equal to (2 arguments)
+- `[!]`: not (1 argument)
+- `[!=]`: not equal to (2 arguments)
+- `[<]`: less than (2 arguments)
+- `[<=]`: less than or equal (2 arguments)
+- `[>]`: greater than (2 arguments)
+- `[>=]`: greater than or equal (2 arguments)
+- `[&]`: and (2 arguments or more)
+- `[|]`: or (2 arguments or more)
+- `[^]`: xor (2 arguments)
+- `[.]`: property access (2 arguments or more)
+- `[,]`: tuple (at least 1 argument)
+- `[|>]`: pipe (2 arguments or more)
+- `[?]`: `?` operator (1 argument)
 
 # Alternative Writing
 
@@ -153,8 +182,6 @@ try {
     // statements
 } catch name {
     // if an error happened
-} finally {
-    // if no errors happened
 }
 
 // loops

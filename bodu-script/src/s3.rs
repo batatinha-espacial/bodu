@@ -14,7 +14,7 @@ pub enum S3T {
     Number(i64),
     Float(f64),
     String(String),
-    TryCatchFinally(Vec<S3T>, String, Vec<S3T>, Option<Vec<S3T>>), // try, catch, finally: try { ... } catch name { ... } finally { ... }
+    TryCatchFinally(Vec<S3T>, String, Vec<S3T>), // try, catch, finally: try { ... } catch name { ... }
     Return(Box<S3T>), // return: expr
     Throw(Box<S3T>), // throw: expr
     Defer(Vec<S3T>), // defer: { ... }
@@ -57,6 +57,9 @@ pub enum S3T {
     Loop(Vec<S3T>, LoopType, Vec<S3T>, Vec<S3T>, Vec<S3T>, Vec<S3T>),
     Continue(Option<Box<S3T>>),
     Break(Option<Box<S3T>>),
+    Probably, // probably
+    Possibly, // possibly
+    IsntNull(Box<S3T>), // ?expr
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -133,6 +136,14 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         Some(S2T::Maybe) => {
             *i += 1;
             Some((S3T::Maybe, 1))
+        },
+        Some(S2T::Probably) => {
+            *i += 1;
+            Some((S3T::Probably, 1))
+        },
+        Some(S2T::Possibly) => {
+            *i += 1;
+            Some((S3T::Possibly, 1))
         },
         Some(S2T::PlusFn) => {
             *i += 1;
@@ -213,6 +224,10 @@ fn primary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
         Some(S2T::PipeFn) => {
             *i += 1;
             Some((S3T::OperatorFn(Operator::Pipe), 1))
+        },
+        Some(S2T::IsntNullFn) => {
+            *i += 1;
+            Some((S3T::OperatorFn(Operator::IsntNull), 1))
         },
         Some(S2T::OpenParen) => {
             let mut n = 0;
@@ -400,6 +415,7 @@ enum UnaryOp {
     None,
     Negate,
     Not,
+    IsntNull,
 }
 
 fn unary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
@@ -415,15 +431,30 @@ fn unary(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
             n += 1;
             UnaryOp::Not
         },
+        Some(S2T::Question) => {
+            *i += 1;
+            n += 1;
+            UnaryOp::IsntNull
+        },
         _ => UnaryOp::None,
     };
-    match fn_call(input, i) {
+    if let UnaryOp::None = op {
+        return match fn_call(input, i) {
+            Some((v, nn)) => {
+                n += nn;
+                Some((v, n))
+            },
+            _ => None,
+        };
+    }
+    match unary(input, i) {
         Some((v, nn)) => {
             n += nn;
             let v = match op {
-                UnaryOp::None => v,
+                UnaryOp::None => v, // should never happen
                 UnaryOp::Negate => S3T::Negate(Box::new(v)),
                 UnaryOp::Not => S3T::Not(Box::new(v)),
+                UnaryOp::IsntNull => S3T::IsntNull(Box::new(v)),
             };
             Some((v, n))
         },
@@ -1789,44 +1820,7 @@ fn stat_expr(input: &Vec<S2T>, i: &mut usize) -> Option<(S3T, usize)> {
                         return None;
                     },
                 };
-                let finally = match input.get(*i) {
-                    Some(S2T::Finally) => {
-                        *i += 1;
-                        n += 1;
-                        match input.get(*i) {
-                            Some(S2T::OpenBrace) => {
-                                *i += 1;
-                                n += 1;
-                                match stat_list(input, i) {
-                                    Some((v, nn)) => {
-                                        n += nn;
-                                        match input.get(*i) {
-                                            Some(S2T::CloseBrace) => {
-                                                *i += 1;
-                                                n += 1;
-                                                Some(v)
-                                            },
-                                            _ => {
-                                                *i -= n;
-                                                return None;
-                                            },
-                                        }
-                                    },
-                                    _ => {
-                                        *i -= n;
-                                        return None;
-                                    },
-                                }
-                            },
-                            _ => {
-                                *i -= n;
-                                return None;
-                            },
-                        }
-                    },
-                    _ => None,
-                };
-                Some((S3T::TryCatchFinally(try_, catch.0, catch.1, finally), n))
+                Some((S3T::TryCatchFinally(try_, catch.0, catch.1), n))
             },
             _ => None,
         },

@@ -733,6 +733,14 @@ pub async fn orthat(state: StateContainer, a: Container, b: Container) -> Result
     }
 }
 
+pub async fn isnt_null(state: StateContainer, v: Container) -> Result<Container, Container> {
+    let v = resolve_bind(state.clone(), v).await?.lock().await.clone();
+    Ok(match v {
+        Value::Null => make_container(Value::Boolean(false)),
+        _ => make_container(Value::Boolean(true)),
+    })
+}
+
 fn make_function_call(state: StateContainer, args: Vec<Container>, gi: Gi) -> Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
     Box::pin(async move {
         let state = state.clone();
@@ -1225,6 +1233,7 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                     Operator::Property => make_fn!(state, opfn::property),
                     Operator::Tuple => make_fn!(state, opfn::tuple),
                     Operator::Pipe => make_fn!(state, opfn::pipe),
+                    Operator::IsntNull => make_fn!(state, opfn::isnt_null_),
                 };
                 set_var(state.clone(), tmps, res, f).await?;
             },
@@ -1263,6 +1272,30 @@ pub async fn interpret_instructions(state: StateContainer, args: &Vec<Container>
                 } else {
                     set_var(state.clone(), tmps, r1, make_container(Value::Boolean(false))).await?;
                 }
+            },
+            Instruction::Probably(res) => {
+                let probably = match rand::rng().random_range(0..4) {
+                    0 => true,
+                    1 => true,
+                    2 => true,
+                    4 => false,
+                    _ => false, // should never happen
+                };
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(probably))).await?;
+            },
+            Instruction::Possibly(res) => {
+                let probably: bool = match rand::rng().random_range(0..3) {
+                    0 => true,
+                    1 => true,
+                    2 => false,
+                    _ => false, // should never happen
+                };
+                set_var(state.clone(), tmps, res, make_container(Value::Boolean(probably))).await?;
+            },
+            Instruction::IsntNull(res, op) => {
+                let op = get_var(state.clone(), args, tmps, op.clone()).await?;
+                let r = isnt_null(state.clone(), op.clone()).await?;
+                set_var(state.clone(), tmps, res.clone(), r.clone()).await?;
             },
         }
         i += 1;

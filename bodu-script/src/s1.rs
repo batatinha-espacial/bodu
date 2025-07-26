@@ -27,8 +27,7 @@ pub enum S1T {
     KeywordTry, // try
     KeywordCatch, // catch
     KeywordReturn, // return
-    KeywordThrow, // throw
-    KeywordFinally, // finally
+    KeywordThrow, // throw]
     KeywordLoop, // loop
     KeywordWhile, // while
     KeywordUntil, // until
@@ -70,6 +69,8 @@ pub enum S1T {
     KeywordAfter, // after
     KeywordContinue, // continue
     KeywordBreak, // break
+    KeywordProbably, // probably
+    KeywordPossibly, // possibly
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -242,7 +243,6 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
                     "catch" => S1T::KeywordCatch,
                     "return" => S1T::KeywordReturn,
                     "throw" => S1T::KeywordThrow,
-                    "finally" => S1T::KeywordFinally,
                     "loop" => S1T::KeywordLoop,
                     "while" => S1T::KeywordWhile,
                     "until" => S1T::KeywordUntil,
@@ -261,6 +261,8 @@ pub fn s1(contents: String) -> Result<Vec<S1T>, String> {
                     "after" => S1T::KeywordAfter,
                     "continue" => S1T::KeywordContinue,
                     "break" => S1T::KeywordBreak,
+                    "probably" => S1T::KeywordProbably,
+                    "possibly" => S1T::KeywordPossibly,
                     _ => S1T::Identifier(str)
                 });
             }

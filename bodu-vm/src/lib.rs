@@ -133,6 +133,9 @@ pub enum Instruction {
     Maybe(VarIndex), // result
     ToNumber(VarIndex, VarIndex), // result, op
     Iterate(VarIndex, VarIndex, VarIndex), // r1, r2, it
+    Probably(VarIndex), // result
+    Possibly(VarIndex), // result
+    IsntNull(VarIndex, VarIndex), // result, op
 }
 
 #[derive(Clone, Debug)]
@@ -179,4 +182,5 @@ pub enum Operator {
     Property, // .
     Tuple, // ,
     Pipe, // |>
+    IsntNull, // ?
 }

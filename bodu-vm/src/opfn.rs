@@ -1,4 +1,4 @@
-use crate::{make_err, op::{add, and, call, divide, eql, ge, get, gt, le, lt, make_tuple, multiply, negate, neql, not, or, orthat, remainder, subtract, to_boolean_base, xor}, Container, Gi, StateContainer};
+use crate::{make_err, op::{add, and, call, divide, eql, ge, get, gt, isnt_null, le, lt, make_tuple, multiply, negate, neql, not, or, orthat, remainder, subtract, to_boolean_base, xor}, Container, Gi, StateContainer};
 
 pub async fn plus(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() < 2 {
@@ -181,4 +181,11 @@ pub async fn pipe(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
         res = call(state.clone(), res, vec![i]).await?;
     }
     Ok(res)
+}
+
+pub async fn isnt_null_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("[?] requires 1 argument"));
+    }
+    isnt_null(state, args[0].clone()).await
 }
