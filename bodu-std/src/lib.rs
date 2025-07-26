@@ -228,6 +228,8 @@ pub async fn init_global_state(state: StateContainer) {
     make_function!(state, scope, "ord", ord, "ord");
     {
         let os_object = make_object();
+        make_function!(state, os_object, "arch", os::arch, "os.arch");
+        make_function!(state, os_object, "is_unix", os::is_unix, "os.is_unix");
         make_function!(state, os_object, "name", os::name, "os.name");
         set_base(state.clone(), scope.clone(), "os".to_string(), os_object).await.unwrap();
     }
