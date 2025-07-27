@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ffi::{c_char, c_void, CStr, CString}, sync::Arc};
 
-use bodu_vm::{make_container, op::{get, make_object, make_object_base, set, to_boolean_base, to_float_base, to_number_base, to_string_base}, Container, Function, ObjectProp, StateContainer, Value};
+use bodu_vm::{make_container, op::{add, and, call, detuple, divide, eql, ge, get, gt, isnt_null, le, lt, make_object, make_object_base, make_tuple, multiply, negate, neql, not, or, orthat, remainder, set, subtract, to_boolean_base, to_float_base, to_number_base, to_string_base, xor}, Container, Function, ObjectProp, StateContainer, Value};
 use tokio::sync::Mutex;
 
 pub mod op;
@@ -588,7 +588,7 @@ pub extern "C" fn cbodu_newfn(state: *mut CBoduState, f: CBoduFn) -> u64 {
         Function {
             internals,
             state: state.state.clone(),
-            caller_state: true,
+            caller_state: false,
             call: |state, args, gi| {
                 Box::pin(async move {
                     let o = gi(0).unwrap();
@@ -626,5 +626,819 @@ pub extern "C" fn cbodu_newfn(state: *mut CBoduState, f: CBoduFn) -> u64 {
     let i = state.i;
     state.i += 1;
     state.data.insert(i, CBoduVal::Val(make_container(Value::Function(f))));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_setinternal(state: *mut CBoduState, f: u64, i: u64, val: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let f = match state.data.get(&f) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let val = match state.data.get(&val) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    {
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            let f = &mut *f.lock().await;
+            match f {
+                Value::Function(f) => {
+                    f.internals.insert(i, val);
+                },
+                _ => {},
+            }
+            tx.send(()).unwrap()
+        });
+        rx.recv().unwrap();
+    }
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(make_container(Value::Null)));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_add(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(add(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_subtract(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(subtract(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_multiply(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(multiply(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_divide(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(divide(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_remainder(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(remainder(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_negate(state: *mut CBoduState, op: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op = match state.data.get(&op) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(negate(state.clone(), op).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_eql(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(eql(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_neql(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(neql(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_not(state: *mut CBoduState, op: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op = match state.data.get(&op) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(not(state.clone(), op).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_gt(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(gt(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_ge(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(ge(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_lt(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(lt(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_le(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(le(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_and(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(and(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_or(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(or(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_xor(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(xor(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_vec_new(state: *mut CBoduState) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Vec(Vec::new()));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_vec_push(state: *mut CBoduState, i: u64, v: u64) {
+    let state = unsafe {
+        &mut *state
+    };
+    let v = match state.data.get(&v) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    match state.data.get_mut(&i) {
+        Some(CBoduVal::Vec(vec_)) => {
+            vec_.push(v);
+        },
+        _ => {},
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_vec_pop(state: *mut CBoduState, i: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let r = match state.data.get_mut(&i) {
+        Some(CBoduVal::Vec(vec_)) => {
+            match vec_.pop() {
+                Some(v) => v.clone(),
+                _ => make_container(Value::Null)
+            }
+        },
+        _ => make_container(Value::Null),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_vec_len(state: *mut CBoduState, i: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    match state.data.get(&i) {
+        Some(CBoduVal::Vec(vec_)) => {
+            vec_.len() as u64
+        },
+        _ => 0,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_vec_get(state: *mut CBoduState, v: u64, i: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let r = match state.data.get(&v) {
+        Some(CBoduVal::Vec(vec_)) => {
+            match vec_.get(i as usize) {
+                Some(v) => v.clone(),
+                _ => make_container(Value::Null)
+            }
+        },
+        _ => make_container(Value::Null),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_call(state: *mut CBoduState, f: u64, args: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let f = match state.data.get(&f) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let args = match state.data.get(&args) {
+        Some(CBoduVal::Vec(v)) => v.clone(),
+        _ => Vec::new(),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(call(state.clone(), f, args).await)
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_debug(state: *mut CBoduState) -> u8 {
+    let state = unsafe {
+        &mut *state
+    };
+    let state = state.state.clone();
+    let debug = {
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(state.lock().await.debug).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    if debug {
+        1
+    } else {
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_orthat(state: *mut CBoduState, op1: u64, op2: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op1 = match state.data.get(&op1) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let op2 = match state.data.get(&op2) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(orthat(state.clone(), op1, op2).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_isntnull(state: *mut CBoduState, op: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let op = match state.data.get(&op) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(isnt_null(state.clone(), op).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Err(e) => {
+            state.throw = Some(e);
+            make_container(Value::Null)
+        },
+        Ok(v) => v.clone(),
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_maketuple(state: *mut CBoduState, v: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let v = match state.data.get(&v) {
+        Some(CBoduVal::Vec(v)) => v.clone(),
+        _ => Vec::new(),
+    };
+    let r = make_tuple(v);
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_detuple(state: *mut CBoduState, v: u64) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let v = match state.data.get(&v) {
+        Some(CBoduVal::Val(v)) => v.clone(),
+        _ => make_container(Value::Null),
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            tx.send(detuple(state.clone(), v).await).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let r = match r {
+        Ok(r) => r,
+        Err(e) => {
+            state.throw = Some(e);
+            Vec::new()
+        },
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Vec(r));
     i
 }
