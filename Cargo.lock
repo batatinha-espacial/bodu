@@ -113,6 +113,7 @@ checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 name = "bodu"
 version = "0.1.0"
 dependencies = [
+ "bodu-compiler",
  "bodu-script",
  "bodu-std",
  "bodu-vm",
@@ -120,6 +121,13 @@ dependencies = [
  "clap",
  "rustyline",
  "tokio",
+]
+
+[[package]]
+name = "bodu-compiler"
+version = "0.1.0"
+dependencies = [
+ "bodu-vm",
 ]
 
 [[package]]
@@ -136,6 +144,7 @@ dependencies = [
  "base64",
  "bodu-script",
  "bodu-vm",
+ "cbodu",
  "libloading",
  "regex",
  "rustyline",
@@ -163,8 +172,6 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 name = "cbodu"
 version = "0.1.0"
 dependencies = [
- "bodu-script",
- "bodu-std",
  "bodu-vm",
  "libloading",
  "tokio",

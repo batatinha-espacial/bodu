@@ -1,4 +1,4 @@
-use bodu::custom_init;
+use bodu_compiler::compile_instrs;
 use clap::{Arg, ArgAction, Command};
 use rustyline::DefaultEditor;
 use bodu_script::{s1::s1, s2::s2, s3::s3, s4::s4};
@@ -16,20 +16,32 @@ async fn main() {
                 .action(ArgAction::SetTrue)
                 .global(true)
         )
-        .arg(
-            Arg::new("experimental")
-                .short('E')
-                .long("experimental")
-                .help("run in debug mode")
-                .action(ArgAction::SetTrue)
-                .global(true)
-        )
         .subcommand(
             Command::new("run")
                 .arg(
                     Arg::new("file")
                         .required(true)
                 ).about("run a bodu file")
+                .visible_alias("r")
+                .arg(
+                    Arg::new("bodu_args")
+                    .trailing_var_arg(true)
+                    .allow_hyphen_values(true)
+                    .action(ArgAction::Append)
+                    .help("arguments passed to the bodu script")
+                )
+        ).subcommand(
+            Command::new("compile")
+                .arg(
+                    Arg::new("input")
+                        .required(true)
+                )
+                .arg(
+                    Arg::new("output")
+                        .required(true)
+                )
+                .about("compile a bodu file to a bytecode file")
+                .visible_alias("c")
         ).subcommand(
             Command::new("repl")
             .about("start the bodu repl")
@@ -42,10 +54,19 @@ async fn main() {
     if let Some(_) = matches.subcommand_matches("version") {
         println!("Bodu 0.1.0");
     } else if let Some(matches) = matches.subcommand_matches("repl") {
-        repl(matches.get_flag("debug"), matches.get_flag("experimental")).await;
+        repl(matches.get_flag("debug")).await;
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let file = matches.get_one::<String>("file").unwrap();
-        interpret(file.clone(), matches.get_flag("debug"), matches.get_flag("experimental")).await;
+        let args = if let Some(args) = matches.get_many::<String>("bodu_args") {
+            args.map(|s| s.clone()).collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        interpret(file.clone(), matches.get_flag("debug"), args).await;
+    } else if let Some(matches) = matches.subcommand_matches("compile") {
+        let input = matches.get_one::<String>("input").unwrap();
+        let output = matches.get_one::<String>("output").unwrap();
+        compile(input.clone(), output.clone()).await;
     } else {
         cmd.print_help().unwrap();
     }
@@ -53,7 +74,7 @@ async fn main() {
 
 static D: bool = false; // change this if you need to debug the parser
 
-async fn interpret(file: String, debug: bool, experimental: bool) {
+async fn interpret(file: String, debug: bool, args: Vec<String>) {
     let contents = std::fs::read_to_string(file).unwrap();
     let contents = s1(contents).unwrap();
     if D {
@@ -72,10 +93,7 @@ async fn interpret(file: String, debug: bool, experimental: bool) {
         println!("S4: {:#?}", instrs);
     }
     let state = new_global_state(debug).await;
-    init_global_state(state.clone()).await;
-    if experimental {
-        custom_init(state.clone()).await;
-    }
+    init_global_state(state.clone(), args).await;
     let f = make_function(state.clone(), instrs, None).await.unwrap();
     call(state.clone(), f, vec![]).await.unwrap();
     {
@@ -88,13 +106,32 @@ async fn interpret(file: String, debug: bool, experimental: bool) {
     graceful(state.clone()).await;
 }
 
-async fn repl(debug: bool, experimental: bool) {
+async fn compile(input: String, output: String) {
+    let contents = std::fs::read_to_string(input).unwrap();
+    let contents = s1(contents).unwrap();
+    if D {
+        println!("S1: {:#?}", contents);
+    }
+    let contents = s2(contents).unwrap();
+    if D {
+        println!("S2: {:#?}", contents);
+    }
+    let contents = s3(contents).unwrap();
+    if D {
+        println!("S3: {:#?}", contents);
+    }
+    let instrs = s4(contents).unwrap();
+    if D {
+        println!("S4: {:#?}", instrs);
+    }
+    let contents = compile_instrs(instrs);
+    std::fs::write(output, contents).unwrap();
+}
+
+async fn repl(debug: bool) {
     println!("Welcome to the Bodu REPL!");
     let state = new_global_state(debug).await;
-    init_global_state(state.clone()).await;
-    if experimental {
-        custom_init(state.clone()).await;
-    }
+    init_global_state(state.clone(), Vec::new()).await;
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();
     loop {

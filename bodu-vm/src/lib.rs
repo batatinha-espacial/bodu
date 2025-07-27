@@ -86,69 +86,69 @@ pub type StateContainer = Arc<Mutex<State>>;
 // instructions for the VM
 #[derive(Clone, Debug)]
 pub enum Instruction {
-    Add(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Return(VarIndex), // op
-    Throw(VarIndex), // op
-    Call(VarIndex, VarIndex, Vec<VarIndex>), // result, f, ...args
-    Get(VarIndex, VarIndex, VarIndex), // result, obj, prop
-    Multiply(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Negate(VarIndex, VarIndex), // result, op
-    Subtract(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Has(VarIndex, VarIndex, VarIndex), // result, obj, prop
-    Set(VarIndex, VarIndex, VarIndex, VarIndex), // result, obj, prop, value
-    Decl(VarIndex), // op
-    Label(Label),
-    Goto(Label),
-    Eql(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Neql(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    GotoIf(Label, VarIndex),
-    Block(Vec<Instruction>),
-    MakeTuple(VarIndex, Vec<VarIndex>), // result, ...ops
-    DeTuple(Vec<VarIndex>, VarIndex), // ...results, op
-    Divide(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Remainder(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    MakeBind(VarIndex, VarIndex), // result, f
-    Catch(VarIndex, VarIndex, Vec<Instruction>), // err?, err, block
-    Assign(VarIndex, VarIndex), // result, op
-    Defer(Vec<Instruction>),
-    Boolean(VarIndex, bool), // result, op
-    Number(VarIndex, i64), // result, op
-    Float(VarIndex, f64), // result, op
-    String(VarIndex, String), // result, op
-    MakeFunction(VarIndex, Vec<Instruction>), // result, body
-    Not(VarIndex, VarIndex), // result, op
-    Gt(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Ge(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Lt(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Le(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    And(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Or(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    Xor(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    GetPipeShorthand(VarIndex), // result
-    SetPipeShorthand(VarIndex), // op
-    OrThat(VarIndex, VarIndex, VarIndex), // result, op1, op2
-    OperatorFn(VarIndex, Operator), // result, opfn
-    Debug(VarIndex), // result
-    Release(VarIndex), // result
-    Maybe(VarIndex), // result
-    ToNumber(VarIndex, VarIndex), // result, op
-    Iterate(VarIndex, VarIndex, VarIndex), // r1, r2, it
-    Probably(VarIndex), // result
-    Possibly(VarIndex), // result
-    IsntNull(VarIndex, VarIndex), // result, op
+    Add(VarIndex, VarIndex, VarIndex), // 1: result, op1, op2
+    Return(VarIndex), // 2: op
+    Throw(VarIndex), // 3: op
+    Call(VarIndex, VarIndex, Vec<VarIndex>), // 4: result, f, ...args
+    Get(VarIndex, VarIndex, VarIndex), // 5: result, obj, prop
+    Multiply(VarIndex, VarIndex, VarIndex), // 6: result, op1, op2
+    Negate(VarIndex, VarIndex), // 7: result, op
+    Subtract(VarIndex, VarIndex, VarIndex), // 8: result, op1, op2
+    Has(VarIndex, VarIndex, VarIndex), // 9: result, obj, prop
+    Set(VarIndex, VarIndex, VarIndex, VarIndex), // A: result, obj, prop, value
+    Decl(VarIndex), // B: op
+    Label(Label), // C
+    Goto(Label), // D
+    Eql(VarIndex, VarIndex, VarIndex), // E: result, op1, op2
+    Neql(VarIndex, VarIndex, VarIndex), // F: result, op1, op2
+    GotoIf(Label, VarIndex), // 10
+    Block(Vec<Instruction>), // 11
+    MakeTuple(VarIndex, Vec<VarIndex>), // 12: result, ...ops
+    DeTuple(Vec<VarIndex>, VarIndex), // 13: ...results, op
+    Divide(VarIndex, VarIndex, VarIndex), // 14: result, op1, op2
+    Remainder(VarIndex, VarIndex, VarIndex), // 15: result, op1, op2
+    MakeBind(VarIndex, VarIndex), // 16: result, f
+    Catch(VarIndex, VarIndex, Vec<Instruction>), // 17: err?, err, block
+    Assign(VarIndex, VarIndex), // 18: result, op
+    Defer(Vec<Instruction>), // 19
+    Boolean(VarIndex, bool), // 1A: result, op
+    Number(VarIndex, i64), // 1B: result, op
+    Float(VarIndex, f64), // 1C: result, op
+    String(VarIndex, String), // 1D: result, op
+    MakeFunction(VarIndex, Vec<Instruction>), // 1E: result, body
+    Not(VarIndex, VarIndex), // 1F: result, op
+    Gt(VarIndex, VarIndex, VarIndex), // 20: result, op1, op2
+    Ge(VarIndex, VarIndex, VarIndex), // 21: result, op1, op2
+    Lt(VarIndex, VarIndex, VarIndex), // 22: result, op1, op2
+    Le(VarIndex, VarIndex, VarIndex), // 23: result, op1, op2
+    And(VarIndex, VarIndex, VarIndex), // 24: result, op1, op2
+    Or(VarIndex, VarIndex, VarIndex), // 25: result, op1, op2
+    Xor(VarIndex, VarIndex, VarIndex), // 26: result, op1, op2
+    GetPipeShorthand(VarIndex), // 27: result
+    SetPipeShorthand(VarIndex), // 28: op
+    OrThat(VarIndex, VarIndex, VarIndex), // 29: result, op1, op2
+    OperatorFn(VarIndex, Operator), // 2A: result, opfn
+    Debug(VarIndex), // 2B: result
+    Release(VarIndex), // 2C: result
+    Maybe(VarIndex), // 2D: result
+    ToNumber(VarIndex, VarIndex), // 2E: result, op
+    Iterate(VarIndex, VarIndex, VarIndex), // 2F: r1, r2, it
+    Probably(VarIndex), // 30: result
+    Possibly(VarIndex), // 31: result
+    IsntNull(VarIndex, VarIndex), // 32: result, op
 }
 
 #[derive(Clone, Debug)]
 pub enum VarIndex {
-    Arg(usize),
-    Ident(String),
-    Temp(u64),
+    Arg(usize), // 0
+    Ident(String), // 1
+    Temp(u64), // 2
 }
 
 #[derive(Clone, Debug)]
 pub enum Label {
-    Named(String),
-    Unnamed(u64),
+    Named(String), // 0
+    Unnamed(u64), // 1
 }
 
 // type for object externals
@@ -162,25 +162,25 @@ pub fn make_err(v: &str) -> Container {
 // used for operator functions
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Operator {
-    Plus, // +
-    Minus, // -
-    Times, // *
-    Divide, // /
-    Modulus, // %
-    OrThat, // ??
-    Ternary, // ?:
-    EqualTo, // ==
-    Not, // !
-    NotEqualTo, // !=
-    Less, // <
-    LessOrEqual, // <=
-    Greater, // >
-    GreaterOrEqual, // >=
-    And, // &
-    Or, // |
-    Xor, // ^
-    Property, // .
-    Tuple, // ,
-    Pipe, // |>
-    IsntNull, // ?
+    Plus, // 0: +
+    Minus, // 1: -
+    Times, // 2: *
+    Divide, // 3: /
+    Modulus, // 4: %
+    OrThat, // 5: ??
+    Ternary, // 6: ?:
+    EqualTo, // 7: ==
+    Not, // 8: !
+    NotEqualTo, // 9: !=
+    Less, // A: <
+    LessOrEqual, // B: <=
+    Greater, // C: >
+    GreaterOrEqual, // D: >=
+    And, // E: &
+    Or, // F: |
+    Xor, // 10: ^
+    Property, // 11: .
+    Tuple, // 12: ,
+    Pipe, // 13: |>
+    IsntNull, // 14: ?
 }

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use bodu_vm::op::{get_base, make_object, set_base, to_number_base};
+use bodu_vm::op::{add, get_base, gt, lt, make_object, set_base, to_number_base, to_string_base};
 use tokio::sync::Mutex;
 
 use crate::{array::{self, new_with_vec}, vm::{make_container, make_err, op::{call, call_prop, detuple, make_object_base, make_tuple, to_boolean_base}, Container, Function, Gi, StateContainer, Value}};
@@ -265,7 +265,7 @@ pub async fn cycle(state: StateContainer, args: Vec<Container>, _: Gi) -> Result
 }
 
 pub async fn count(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
-    if args.len() < 2 {
+    if args.len() == 0 {
         return Err(make_err("iter.count requires 1 argument"))
     }
     let i = args[0].clone();
@@ -415,4 +415,158 @@ pub async fn map(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<C
         }
     };
     Ok(make_container(Value::Function(g)))
+}
+
+pub async fn sum(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("iter.sum requires 1 argument"))
+    }
+    let i = args[0].clone();
+    let mut sum = make_container(Value::Number(0));
+    loop {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.sum")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            break;
+        }
+        let rv = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.sum")),
+            Some(v) => v.clone(),
+        };
+        sum = add(state.clone(), sum, rv).await?;
+    }
+    Ok(sum)
+}
+
+pub async fn min(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("iter.min requires 1 argument"))
+    }
+    let i = args[0].clone();
+    let mut min = make_container(Value::Number(0));
+    {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.min")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            return Ok(min);
+        }
+        min = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.min")),
+            Some(v) => v.clone(),
+        };
+    }
+    loop {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.min")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            break;
+        }
+        let rv = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.min")),
+            Some(v) => v.clone(),
+        };
+        let lower = lt(state.clone(), rv.clone(), min.clone()).await?;
+        if to_boolean_base(state.clone(), lower.clone()).await? {
+            min = rv;
+        }
+    }
+    Ok(min)
+}
+
+pub async fn max(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("iter.max requires 1 argument"))
+    }
+    let i = args[0].clone();
+    let mut max = make_container(Value::Number(0));
+    {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.max")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            return Ok(max);
+        }
+        max = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.max")),
+            Some(v) => v.clone(),
+        };
+    }
+    loop {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.max")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            break;
+        }
+        let rv = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.max")),
+            Some(v) => v.clone(),
+        };
+        let greater = gt(state.clone(), rv.clone(), max.clone()).await?;
+        if to_boolean_base(state.clone(), greater.clone()).await? {
+            max = rv;
+        }
+    }
+    Ok(max)
+}
+
+pub async fn join(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("iter.join requires 2 arguments"))
+    }
+    let i = args[0].clone();
+    let sep = to_string_base(state.clone(), args[1].clone()).await?;
+    let mut res = String::new();
+    {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            return Ok(make_container(Value::String(res)));
+        }
+        let r =  match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => to_string_base(state.clone(), v.clone()).await?,
+        };
+        res += &r;
+    }
+    loop {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            break;
+        }
+        let rv = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => v.clone(),
+        };
+        res += &sep;
+        res += &to_string_base(state.clone(), rv).await?;
+    }
+    Ok(make_container(Value::String(res)))
 }

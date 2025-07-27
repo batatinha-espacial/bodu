@@ -59,7 +59,7 @@ pub async fn load_lib(state: StateContainer, name: String) -> Result<Container, 
                 })
             },
             state: state.clone(),
-            caller_state: true,
+            caller_state: false,
         }
     };
     Ok(make_container(Value::Function(f)))

@@ -1,5 +1,6 @@
 use bodu_vm::op::{get_base, make_function, new_state, to_boolean_base};
 pub use bodu_vm as vm;
+use cbodu::op::load_lib;
 
 use std::{collections::HashMap, io::Write, sync::Arc};
 
@@ -101,9 +102,22 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
     s
 }
 
-pub async fn init_global_state(state: StateContainer) {
+pub async fn init_global_state(state: StateContainer, args_: Vec<String>) {
     let scope = state.lock().await.scope.clone();
-    make_function!(state, scope, "atob", atob, "atob");
+    {
+        let mut internals = HashMap::new();
+        let mut o = make_object_base();
+        o.externals.insert(0, Arc::new(Mutex::new(Box::new(args_.clone()))));
+        let o = make_container(Value::Object(o));
+        internals.insert(0, o);
+        let fn_ = Function {
+            internals,
+            call: args,
+            state: state.clone(),
+            caller_state: false,
+        };
+        set_base(state.clone(), scope.clone(), "args".to_string(), make_container(Value::Function(fn_))).await.unwrap();
+    }
     {
         let array_object = make_object();
         make_function!(state, array_object, "is_array", array::is_array, "array.is_array");
@@ -111,6 +125,7 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "array".to_string(), array_object).await.unwrap();
     }
     make_function_true!(state, scope, "async", async_, "async");
+    make_function!(state, scope, "atob", atob, "atob");
     make_function!(state, scope, "await", await_, "await");
     make_function_true!(state, scope, "awaitfn", awaitfn, "awaitfn");
     make_function!(state, scope, "bin", bin, "bin");
@@ -149,8 +164,12 @@ pub async fn init_global_state(state: StateContainer) {
         make_function_true!(state, iter_object, "cycle", iter::cycle, "iter.cycle");
         make_function_true!(state, iter_object, "enumerate", iter::enumerate, "iter.enumerate");
         make_function_true!(state, iter_object, "filter", iter::filter, "iter.filter");
+        make_function_true!(state, iter_object, "join", iter::join, "iter.join");
         make_function_true!(state, iter_object, "map", iter::map, "iter.map");
+        make_function_true!(state, iter_object, "max", iter::max, "iter.max");
+        make_function_true!(state, iter_object, "min", iter::min, "iter.min");
         make_function_true!(state, iter_object, "reverse", iter::reverse, "iter.reverse");
+        make_function_true!(state, iter_object, "sum", iter::sum, "iter.sum");
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).await.unwrap();
     }
     {
@@ -161,6 +180,7 @@ pub async fn init_global_state(state: StateContainer) {
     }
     make_function!(state, scope, "load", load, "load");
     make_function_true!(state, scope, "load_here", load_here, "load_here");
+    make_function_true!(state, scope, "load_lib", load_lib_, "load_lib");
     {
         let math_obj = make_object();
         make_function!(state, math_obj, "abs", math::abs, "math.abs");
@@ -228,6 +248,8 @@ pub async fn init_global_state(state: StateContainer) {
     make_function!(state, scope, "ord", ord, "ord");
     {
         let os_object = make_object();
+        make_function!(state, os_object, "arch", os::arch, "os.arch");
+        make_function!(state, os_object, "is_unix", os::is_unix, "os.is_unix");
         make_function!(state, os_object, "name", os::name, "os.name");
         set_base(state.clone(), scope.clone(), "os".to_string(), os_object).await.unwrap();
     }
@@ -270,15 +292,70 @@ pub async fn init_global_state(state: StateContainer) {
             obj.metaobj = metaobj;
             make_container(Value::Object(obj))
         };
+        make_function!(state, string_obj, "capitalize", string::capitalize, "string.capitalize");
         make_function!(state, string_obj, "chars", string::chars, "string.chars");
+        make_function!(state, string_obj, "contains", string::contains, "string.contains");
         make_function!(state, string_obj, "count_chars", string::count_chars, "string.count_chars");
+        make_function!(state, string_obj, "ends_with", string::ends_with, "string.ends_with");
+        make_function!(state, string_obj, "find", string::find, "string.find");
+        make_function!(state, string_obj, "is_ascii", string::is_ascii, "string.is_ascii");
+        make_function!(state, string_obj, "is_char_boundary", string::is_char_boundary, "string.is_char_boundary");
+        make_function!(state, string_obj, "is_empty", string::is_empty, "string.is_empty");
         make_function!(state, string_obj, "len", string::len, "string.len");
+        make_function!(state, string_obj, "lines", string::lines, "string.lines");
+        make_function!(state, string_obj, "lowercase", string::lowercase, "string.lowercase");
         make_function!(state, string_obj, "ords", string::ords, "string.ords");
         make_function!(state, string_obj, "reverse", string::reverse, "string.reverse");
+        make_function!(state, string_obj, "starts_with", string::starts_with, "string.starts_with");
         make_function!(state, string_obj, "trim", string::trim, "string.trim");
+        make_function!(state, string_obj, "uppercase", string::uppercase, "string.uppercase");
         set_base(state.clone(), scope.clone(), "string".to_string(), string_obj).await.unwrap();
     }
     make_function!(state, scope, "type", type_, "type");
+}
+
+fn args(state: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let o = gi(0).unwrap();
+        let o = (match o.lock().await.clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        }).unwrap();
+        let o = o.externals.get(&0).unwrap().clone();
+        let mut o = o.lock().await;
+        let o = o.downcast_mut::<Vec<String>>().unwrap();
+        let f = {
+            let mut internals = HashMap::new();
+            let mut oo = make_object_base();
+            oo.externals.insert(0, Arc::new(Mutex::new(Box::new(o.clone().into_iter()))));
+            let oo = make_container(Value::Object(oo));
+            internals.insert(0, oo);
+            Function {
+                internals,
+                call: args_next_wrapper,
+                state: state.clone(),
+                caller_state: false,
+            }
+        };
+        Ok(make_container(Value::Function(f)))
+    })
+}
+
+fn args_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let i = gi(0).unwrap();
+        let i = (match i.lock().await.clone() {
+            Value::Object(i) => Some(i),
+            _ => None,
+        }).unwrap();
+        let i = i.externals.get(&0).unwrap().clone();
+        let mut i = i.lock().await;
+        let i = i.downcast_mut::<<Vec<String> as IntoIterator>::IntoIter>().unwrap();
+        Ok(match i.next() {
+            None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
+            Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), make_container(Value::String(i))]),
+        })
+    })
 }
 
 async fn print(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -777,4 +854,13 @@ async fn push_gdefer(state: StateContainer, args: Vec<Container>, _: Gi) -> Resu
         threads.gdefers.push(args[0].clone());
     }
     Ok(make_container(Value::Null))
+}
+
+pub async fn load_lib_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("load_lib requires 1 argument"));
+    }
+    let a = to_string_base(state.clone(), args[0].clone()).await?;
+    let f = load_lib(state.clone(), a).await?;
+    Ok(f)
 }
