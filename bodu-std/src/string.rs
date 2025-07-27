@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use bodu_vm::{make_container, make_err, op::{make_object_base, make_tuple, to_string_base}, Container, Function, Gi, StateContainer, Value};
+use bodu_vm::{make_container, make_err, op::{make_object_base, make_tuple, to_number_base, to_string_base}, Container, Function, Gi, StateContainer, Value};
 use tokio::sync::Mutex;
 
 pub async fn len(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
@@ -142,4 +142,108 @@ pub async fn capitalize(state: StateContainer, args: Vec<Container>, _: Gi) -> R
         }
     };
     Ok(make_container(Value::String(s)))
+}
+
+pub async fn contains(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("string.contains requires 2 arguments"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let pat = to_string_base(state.clone(), args[1].clone()).await?;
+    Ok(make_container(Value::Boolean(s.contains(&pat))))
+}
+
+pub async fn ends_with(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("string.ends_with requires 2 arguments"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let pat = to_string_base(state.clone(), args[1].clone()).await?;
+    Ok(make_container(Value::Boolean(s.ends_with(&pat))))
+}
+
+pub async fn find(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("string.find requires 2 arguments"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let pat = to_string_base(state.clone(), args[1].clone()).await?;
+    let r = s.find(&pat);
+    match r {
+        None => Ok(make_container(Value::Null)),
+        Some(r) => Ok(make_container(Value::Number(r as i64))),
+    }
+}
+
+pub async fn is_ascii(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.is_ascii requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::Boolean(s.is_ascii())))
+}
+
+pub async fn is_char_boundary(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("string.is_char_boundary requires 2 arguments"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let i = to_number_base(state.clone(), args[1].clone()).await?;
+    Ok(make_container(Value::Boolean(s.is_char_boundary(i as usize))))
+}
+
+pub async fn is_empty(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.is_empty requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::Boolean(s.is_empty())))
+}
+
+pub async fn lines(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.lines requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let s = s.lines().map(|s| s.to_string()).collect::<Vec<String>>();
+    let f = {
+        let mut internals = HashMap::new();
+        let mut oo = make_object_base();
+        oo.externals.insert(0, Arc::new(Mutex::new(Box::new(s.into_iter()))));
+        let oo = make_container(Value::Object(oo));
+        internals.insert(0, oo);
+        Function {
+            internals,
+            call: lines_next_wrapper,
+            state: state.clone(),
+            caller_state: false,
+        }
+    };
+    Ok(make_container(Value::Function(f)))
+}
+
+fn lines_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let i = gi(0).unwrap();
+        let i = (match i.lock().await.clone() {
+            Value::Object(i) => Some(i),
+            _ => None,
+        }).unwrap();
+        let i = i.externals.get(&0).unwrap().clone();
+        let mut i = i.lock().await;
+        let i = i.downcast_mut::<<Vec<String> as IntoIterator>::IntoIter>().unwrap();
+        Ok(match i.next() {
+            None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
+            Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), make_container(Value::String(i))]),
+        })
+    })
+}
+
+pub async fn starts_with(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("string.starts_with requires 2 arguments"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let pat = to_string_base(state.clone(), args[1].clone()).await?;
+    Ok(make_container(Value::Boolean(s.starts_with(&pat))))
 }
