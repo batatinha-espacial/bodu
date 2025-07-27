@@ -151,7 +151,10 @@ pub async fn init_global_state(state: StateContainer) {
         make_function_true!(state, iter_object, "enumerate", iter::enumerate, "iter.enumerate");
         make_function_true!(state, iter_object, "filter", iter::filter, "iter.filter");
         make_function_true!(state, iter_object, "map", iter::map, "iter.map");
+        make_function_true!(state, iter_object, "max", iter::max, "iter.max");
+        make_function_true!(state, iter_object, "min", iter::min, "iter.min");
         make_function_true!(state, iter_object, "reverse", iter::reverse, "iter.reverse");
+        make_function_true!(state, iter_object, "sum", iter::sum, "iter.sum");
         set_base(state.clone(), scope.clone(), "iter".to_string(), iter_object).await.unwrap();
     }
     {
@@ -274,12 +277,15 @@ pub async fn init_global_state(state: StateContainer) {
             obj.metaobj = metaobj;
             make_container(Value::Object(obj))
         };
+        make_function!(state, string_obj, "capitalize", string::capitalize, "string.capitalize");
         make_function!(state, string_obj, "chars", string::chars, "string.chars");
         make_function!(state, string_obj, "count_chars", string::count_chars, "string.count_chars");
         make_function!(state, string_obj, "len", string::len, "string.len");
+        make_function!(state, string_obj, "lowercase", string::lowercase, "string.lowercase");
         make_function!(state, string_obj, "ords", string::ords, "string.ords");
         make_function!(state, string_obj, "reverse", string::reverse, "string.reverse");
         make_function!(state, string_obj, "trim", string::trim, "string.trim");
+        make_function!(state, string_obj, "uppercase", string::uppercase, "string.uppercase");
         set_base(state.clone(), scope.clone(), "string".to_string(), string_obj).await.unwrap();
     }
     make_function!(state, scope, "type", type_, "type");

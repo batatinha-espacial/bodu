@@ -110,3 +110,36 @@ pub async fn reverse(state: StateContainer, args: Vec<Container>, _: Gi) -> Resu
     let s = to_string_base(state.clone(), args[0].clone()).await?;
     Ok(make_container(Value::String(s.chars().rev().collect())))
 }
+
+pub async fn uppercase(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.uppercase requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(s.to_uppercase())))
+}
+
+pub async fn lowercase(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.lowercase requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    Ok(make_container(Value::String(s.to_lowercase())))
+}
+
+pub async fn capitalize(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("string.capitalize requires 1 argument"));
+    }
+    let s = to_string_base(state.clone(), args[0].clone()).await?;
+    let s = {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(first) => {
+                first.to_uppercase().collect::<String>() + chars.as_str()
+            },
+        }
+    };
+    Ok(make_container(Value::String(s)))
+}
