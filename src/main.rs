@@ -23,6 +23,13 @@ async fn main() {
                         .required(true)
                 ).about("run a bodu file")
                 .visible_alias("r")
+                .arg(
+                    Arg::new("bodu_args")
+                    .trailing_var_arg(true)
+                    .allow_hyphen_values(true)
+                    .action(ArgAction::Append)
+                    .help("arguments passed to the bodu script")
+                )
         ).subcommand(
             Command::new("compile")
                 .arg(
@@ -50,7 +57,12 @@ async fn main() {
         repl(matches.get_flag("debug")).await;
     } else if let Some(matches) = matches.subcommand_matches("run") {
         let file = matches.get_one::<String>("file").unwrap();
-        interpret(file.clone(), matches.get_flag("debug")).await;
+        let args = if let Some(args) = matches.get_many::<String>("bodu_args") {
+            args.map(|s| s.clone()).collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        interpret(file.clone(), matches.get_flag("debug"), args).await;
     } else if let Some(matches) = matches.subcommand_matches("compile") {
         let input = matches.get_one::<String>("input").unwrap();
         let output = matches.get_one::<String>("output").unwrap();
@@ -62,7 +74,7 @@ async fn main() {
 
 static D: bool = false; // change this if you need to debug the parser
 
-async fn interpret(file: String, debug: bool) {
+async fn interpret(file: String, debug: bool, args: Vec<String>) {
     let contents = std::fs::read_to_string(file).unwrap();
     let contents = s1(contents).unwrap();
     if D {
@@ -81,7 +93,7 @@ async fn interpret(file: String, debug: bool) {
         println!("S4: {:#?}", instrs);
     }
     let state = new_global_state(debug).await;
-    init_global_state(state.clone()).await;
+    init_global_state(state.clone(), args).await;
     let f = make_function(state.clone(), instrs, None).await.unwrap();
     call(state.clone(), f, vec![]).await.unwrap();
     {
@@ -119,7 +131,7 @@ async fn compile(input: String, output: String) {
 async fn repl(debug: bool) {
     println!("Welcome to the Bodu REPL!");
     let state = new_global_state(debug).await;
-    init_global_state(state.clone()).await;
+    init_global_state(state.clone(), Vec::new()).await;
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();
     loop {

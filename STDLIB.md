@@ -4,6 +4,10 @@ Finally some standard library docs. Currently it only documents globals.
 
 # Globals
 
+## `args()`
+
+Returns an `iterator` over the arguments passed to the bodu program.
+
 ## `atob(s)`
 
 Decodes `s` (a string) as base64 and returns a `buffer` with the result.

@@ -102,9 +102,22 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
     s
 }
 
-pub async fn init_global_state(state: StateContainer) {
+pub async fn init_global_state(state: StateContainer, args_: Vec<String>) {
     let scope = state.lock().await.scope.clone();
-    make_function!(state, scope, "atob", atob, "atob");
+    {
+        let mut internals = HashMap::new();
+        let mut o = make_object_base();
+        o.externals.insert(0, Arc::new(Mutex::new(Box::new(args_.clone()))));
+        let o = make_container(Value::Object(o));
+        internals.insert(0, o);
+        let fn_ = Function {
+            internals,
+            call: args,
+            state: state.clone(),
+            caller_state: false,
+        };
+        set_base(state.clone(), scope.clone(), "args".to_string(), make_container(Value::Function(fn_))).await.unwrap();
+    }
     {
         let array_object = make_object();
         make_function!(state, array_object, "is_array", array::is_array, "array.is_array");
@@ -112,6 +125,7 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "array".to_string(), array_object).await.unwrap();
     }
     make_function_true!(state, scope, "async", async_, "async");
+    make_function!(state, scope, "atob", atob, "atob");
     make_function!(state, scope, "await", await_, "await");
     make_function_true!(state, scope, "awaitfn", awaitfn, "awaitfn");
     make_function!(state, scope, "bin", bin, "bin");
@@ -298,6 +312,50 @@ pub async fn init_global_state(state: StateContainer) {
         set_base(state.clone(), scope.clone(), "string".to_string(), string_obj).await.unwrap();
     }
     make_function!(state, scope, "type", type_, "type");
+}
+
+fn args(state: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let o = gi(0).unwrap();
+        let o = (match o.lock().await.clone() {
+            Value::Object(o) => Some(o),
+            _ => None,
+        }).unwrap();
+        let o = o.externals.get(&0).unwrap().clone();
+        let mut o = o.lock().await;
+        let o = o.downcast_mut::<Vec<String>>().unwrap();
+        let f = {
+            let mut internals = HashMap::new();
+            let mut oo = make_object_base();
+            oo.externals.insert(0, Arc::new(Mutex::new(Box::new(o.clone().into_iter()))));
+            let oo = make_container(Value::Object(oo));
+            internals.insert(0, oo);
+            Function {
+                internals,
+                call: args_next_wrapper,
+                state: state.clone(),
+                caller_state: false,
+            }
+        };
+        Ok(make_container(Value::Function(f)))
+    })
+}
+
+fn args_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let i = gi(0).unwrap();
+        let i = (match i.lock().await.clone() {
+            Value::Object(i) => Some(i),
+            _ => None,
+        }).unwrap();
+        let i = i.externals.get(&0).unwrap().clone();
+        let mut i = i.lock().await;
+        let i = i.downcast_mut::<<Vec<String> as IntoIterator>::IntoIter>().unwrap();
+        Ok(match i.next() {
+            None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
+            Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), make_container(Value::String(i))]),
+        })
+    })
 }
 
 async fn print(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
