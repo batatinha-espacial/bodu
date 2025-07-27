@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use bodu_vm::op::{add, get_base, gt, lt, make_object, set_base, to_number_base};
+use bodu_vm::op::{add, get_base, gt, lt, make_object, set_base, to_number_base, to_string_base};
 use tokio::sync::Mutex;
 
 use crate::{array::{self, new_with_vec}, vm::{make_container, make_err, op::{call, call_prop, detuple, make_object_base, make_tuple, to_boolean_base}, Container, Function, Gi, StateContainer, Value}};
@@ -526,4 +526,47 @@ pub async fn max(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<C
         }
     }
     Ok(max)
+}
+
+pub async fn join(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() < 2 {
+        return Err(make_err("iter.join requires 2 arguments"))
+    }
+    let i = args[0].clone();
+    let sep = to_string_base(state.clone(), args[1].clone()).await?;
+    let mut res = String::new();
+    {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            return Ok(make_container(Value::String(res)));
+        }
+        let r =  match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => to_string_base(state.clone(), v.clone()).await?,
+        };
+        res += &r;
+    }
+    loop {
+        let r = call(state.clone(), i.clone(), Vec::new()).await?;
+        let r = detuple(state.clone(), r).await?;
+        let b = match r.get(0) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => to_boolean_base(state.clone(), v.clone()).await?,
+        };
+        if !b {
+            break;
+        }
+        let rv = match r.get(1) {
+            None => return Err(make_err("invalid iterator passed to iter.join")),
+            Some(v) => v.clone(),
+        };
+        res += &sep;
+        res += &to_string_base(state.clone(), rv).await?;
+    }
+    Ok(make_container(Value::String(res)))
 }

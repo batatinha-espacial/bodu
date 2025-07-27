@@ -150,6 +150,7 @@ pub async fn init_global_state(state: StateContainer) {
         make_function_true!(state, iter_object, "cycle", iter::cycle, "iter.cycle");
         make_function_true!(state, iter_object, "enumerate", iter::enumerate, "iter.enumerate");
         make_function_true!(state, iter_object, "filter", iter::filter, "iter.filter");
+        make_function_true!(state, iter_object, "join", iter::join, "iter.join");
         make_function_true!(state, iter_object, "map", iter::map, "iter.map");
         make_function_true!(state, iter_object, "max", iter::max, "iter.max");
         make_function_true!(state, iter_object, "min", iter::min, "iter.min");

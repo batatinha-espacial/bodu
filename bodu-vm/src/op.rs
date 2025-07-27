@@ -466,6 +466,27 @@ pub async fn divide(state: StateContainer, a: Container, b: Container) -> Result
         (Value::Float(a), Value::Number(b)) => Ok(make_container(Value::Float(a/(b as f64)))),
         (Value::Float(a), Value::Float(b)) => Ok(make_container(Value::Float(a/b))),
         (Value::Boolean(a), Value::Boolean(b)) => Ok(make_container(Value::Boolean(!(a|b)))),
+        (Value::Function(_), Value::Function(_)) => {
+            let h = {
+                let mut internals = HashMap::new();
+                internals.insert(0, x);
+                internals.insert(1, y);
+                Function {
+                    internals,
+                    state: state.clone(),
+                    caller_state: true,
+                    call: |state, args, gi| {
+                        Box::pin(async move {
+                            let f = gi(0).unwrap();
+                            let g = gi(1).unwrap();
+                            call(state.clone(), f, args.clone()).await?;
+                            call(state.clone(), g, args.clone()).await
+                        })
+                    },
+                }
+            };
+            Ok(make_container(Value::Function(h)))
+        },
         (Value::Object(obj), _) => call_metaprop(state.clone(), obj, vec![x, y], "divide".to_string()).await,
         (_, Value::Object(obj)) => call_metaprop(state.clone(), obj, vec![x, y], "divide".to_string()).await,
         _ => Err(make_err("cannot divide a by b")),

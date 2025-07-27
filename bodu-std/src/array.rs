@@ -107,8 +107,8 @@ macro_rules! helper2 {
     }};
 }
 
-pub async fn new(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
-    new_with_vec(state, Vec::new()).await
+pub async fn new(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    new_with_vec(state, args).await
 }
 
 pub async fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result<Container, Container> {

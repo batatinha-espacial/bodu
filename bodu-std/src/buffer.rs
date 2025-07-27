@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use bodu_vm::op::make_tuple;
 use tokio::sync::Mutex;
 
 use crate::vm::{make_container, make_err, op::{make_object, make_object_base, set_base, to_number_base, to_string_base}, Container, Function, Gi, StateContainer, Value};
@@ -75,6 +76,9 @@ pub async fn new_from_vec(state: StateContainer, data: Vec<u8>) -> Result<Contai
     helper1!(state, get, o, "get");
     helper1!(state, len, o, "len");
     helper1!(state, to_string_utf8, o, "to_string_utf8");
+    helper1!(state, to_string_utf16be, o, "to_string_utf16be");
+    helper1!(state, to_string_utf16le, o, "to_string_utf16le");
+    helper1!(state, iter, o, "iter");
     
     Ok(o)
 }
@@ -154,5 +158,93 @@ async fn to_string_utf8(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<
     match s {
         Ok(s) => Ok(make_container(Value::String(s))),
         Err(_) => Err(make_err("buffer.to_string_utf8 can't decode invalid utf8")),
+    }
+}
+
+async fn iter(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<u8>>().unwrap();
+    let f = {
+        let mut internals = HashMap::new();
+        let mut oo = make_object_base();
+        oo.externals.insert(0, Arc::new(Mutex::new(Box::new(o.clone().into_iter()))));
+        let oo = make_container(Value::Object(oo));
+        internals.insert(0, oo);
+        Function {
+            internals,
+            call: iter_next_wrapper,
+            state: state.clone(),
+            caller_state: false,
+        }
+    };
+    Ok(make_container(Value::Function(f)))
+}
+
+fn iter_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        let i = gi(0).unwrap();
+        let i = (match i.lock().await.clone() {
+            Value::Object(i) => Some(i),
+            _ => None,
+        }).unwrap();
+        let i = i.externals.get(&0).unwrap().clone();
+        let mut i = i.lock().await;
+        let i = i.downcast_mut::<<Vec<u8> as IntoIterator>::IntoIter>().unwrap();
+        Ok(match i.next() {
+            None => make_tuple(vec![make_container(Value::Boolean(false)), make_container(Value::Null)]),
+            Some(i) => make_tuple(vec![make_container(Value::Boolean(true)), make_container(Value::Number(i as i64))]),
+        })
+    })
+}
+
+async fn to_string_utf16be(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<u8>>().unwrap();
+    if o.len() % 2 != 0 {
+        return Err(make_err("buffer.to_string_utf16be can't decode invalid buffer"))
+    }
+    let u16_slice = o
+        .chunks_exact(2)
+        .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    let s = String::from_utf16(&u16_slice);
+    match s {
+        Ok(s) => Ok(make_container(Value::String(s))),
+        Err(_) => Err(make_err("buffer.to_string_utf16be can't decode invalid buffer")),
+    }
+}
+
+async fn to_string_utf16le(_: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<u8>>().unwrap();
+    if o.len() % 2 != 0 {
+        return Err(make_err("buffer.to_string_utf16le can't decode invalid buffer"))
+    }
+    let u16_slice = o
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    let s = String::from_utf16(&u16_slice);
+    match s {
+        Ok(s) => Ok(make_container(Value::String(s))),
+        Err(_) => Err(make_err("buffer.to_string_utf16le can't decode invalid buffer")),
     }
 }
