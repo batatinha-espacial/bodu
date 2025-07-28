@@ -150,6 +150,7 @@ pub async fn init_global_state(state: StateContainer, args_: Vec<String>) {
     make_function!(state, scope, "from_bin", from_bin, "from_bin");
     make_function!(state, scope, "from_hex", from_hex, "from_hex");
     make_function!(state, scope, "from_oct", from_oct, "from_oct");
+    make_function!(state, scope, "global", global, "global");
     make_function!(state, scope, "hex", hex, "hex");
     make_function!(state, scope, "hex_upper", hex_upper, "hex_upper");
     make_function!(state, scope, "id", id, "id");
@@ -241,6 +242,7 @@ pub async fn init_global_state(state: StateContainer, args_: Vec<String>) {
     make_function!(state, scope, "number", number, "number");
     {
         let obj_obj = make_object();
+        make_function!(state, obj_obj, "keys", object::keys, "object.keys");
         make_function!(state, obj_obj, "new", object::new, "object.new");
         set_base(state.clone(), scope.clone(), "object".to_string(), obj_obj).await.unwrap();
     }
@@ -856,11 +858,22 @@ async fn push_gdefer(state: StateContainer, args: Vec<Container>, _: Gi) -> Resu
     Ok(make_container(Value::Null))
 }
 
-pub async fn load_lib_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+async fn load_lib_(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
     if args.len() == 0 {
         return Err(make_err("load_lib requires 1 argument"));
     }
     let a = to_string_base(state.clone(), args[0].clone()).await?;
     let f = load_lib(state.clone(), a).await?;
     Ok(f)
+}
+
+async fn global(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    let global = {
+        let state = &mut *state.lock().await;
+        state.global.clone().unwrap()
+    };
+    let res = {
+        global.lock().await.scope.clone()
+    };
+    Ok(res)
 }

@@ -605,6 +605,7 @@ pub fn make_object_base() -> Object {
         internals: HashMap::new(),
         metaobj: make_container(Value::Null),
         externals: HashMap::new(),
+        metalocked: true,
     }
 }
 

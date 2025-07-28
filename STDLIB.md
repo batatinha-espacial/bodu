@@ -64,6 +64,10 @@ Parses `s` (a string) as a hexadecimal integer.
 
 Parses `s` (a string) as an octal integer.
 
+## `global()`
+
+Returns the global object.
+
 ## `hex(n)`
 
 Converts `n` (a number) to its string representation in base-16 (hexadecimal), using lowercase characters.

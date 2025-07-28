@@ -58,3 +58,5 @@ extern uint64_t cbodu_orthat(cbodu_state*, uint64_t, uint64_t);
 extern uint64_t cbodu_isntnull(cbodu_state*, uint64_t);
 extern uint64_t cbodu_maketuple(cbodu_state*, uint64_t);
 extern uint64_t cbodu_detuple(cbodu_state*, uint64_t);
+extern void cbodu_clearerr(cbodu_state*);
+extern uint64_t cbodu_getregister(cbodu_state*, const char*);

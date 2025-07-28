@@ -1442,3 +1442,38 @@ pub extern "C" fn cbodu_detuple(state: *mut CBoduState, v: u64) -> u64 {
     state.data.insert(i, CBoduVal::Vec(r));
     i
 }
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_clearerr(state: *mut CBoduState) {
+    let state = unsafe {
+        &mut *state
+    };
+    state.throw = None;
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn cbodu_getregister(state: *mut CBoduState, s: *const c_char) -> u64 {
+    let state = unsafe {
+        &mut *state
+    };
+    let s = unsafe {
+        CStr::from_ptr(s).to_string_lossy().to_string()
+    };
+    let r = {
+        let state = state.state.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tokio::spawn(async move {
+            let gd = &mut *state.lock().await;
+            let gd = &mut *gd.globaldata.as_mut().unwrap().lock().await;
+            tx.send(match gd.register.get(&s) {
+                Some(v) => v.clone(),
+                None => make_container(Value::Null),
+            }).unwrap();
+        });
+        rx.recv().unwrap()
+    };
+    let i = state.i;
+    state.i += 1;
+    state.data.insert(i, CBoduVal::Val(r));
+    i
+}
