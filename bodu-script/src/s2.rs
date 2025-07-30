@@ -539,10 +539,10 @@ fn opfn_helper(iterr: &mut Peekable<Iter<'_, S2T>>, tok: S2T, tokfail: S2T, res:
 
 fn parse_int(s: String, base: Base) -> i64 {
     match base {
-        Base::B10 => i64::from_str_radix(&s, 10).unwrap(),
-        Base::B2 => i64::from_str_radix(&s, 2).unwrap(),
-        Base::B8 => i64::from_str_radix(&s, 8).unwrap(),
-        Base::B16 => i64::from_str_radix(&s, 16).unwrap(),
+        Base::B10 => i64::from_str_radix(&s, 10).unwrap_or(i64::MAX),
+        Base::B2 => i64::from_str_radix(&s, 2).unwrap_or(i64::MAX),
+        Base::B8 => i64::from_str_radix(&s, 8).unwrap_or(i64::MAX),
+        Base::B16 => i64::from_str_radix(&s, 16).unwrap_or(i64::MAX),
     }
 }
 

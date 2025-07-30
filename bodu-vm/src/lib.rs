@@ -1,4 +1,4 @@
-use std::{any::Any, collections::HashMap, pin::Pin, sync::Arc};
+use std::{any::Any, collections::HashMap, path::PathBuf, pin::Pin, sync::Arc};
 
 use libloading::Library;
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -65,6 +65,8 @@ pub struct State {
     pub global: Option<StateContainer>, // global state
     pub globaldata: Option<Arc<Mutex<GlobalData>>>, // global data
     pub debug: bool, // whether debug mode is active
+    pub pkgpath: Vec<PathBuf>,
+    pub curdir: PathBuf,
 }
 
 #[derive(Debug)]
@@ -79,6 +81,8 @@ pub struct GlobalData {
     pub libid: u64,
     pub libs: HashMap<u64, Arc<Library>>,
     pub register: HashMap<String, Container>,
+    pub pkgs_release: HashMap<PathBuf, Container>,
+    pub pkgs_debug: HashMap<PathBuf, Container>,
 }
 
 // Container but for States

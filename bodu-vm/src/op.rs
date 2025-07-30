@@ -812,6 +812,12 @@ pub async fn new_state(state: StateContainer) -> StateContainer {
         debug: {
             state.lock().await.debug
         },
+        pkgpath: {
+            state.lock().await.pkgpath.clone()
+        },
+        curdir: {
+            state.lock().await.curdir.clone()
+        },
     }))
 }
 

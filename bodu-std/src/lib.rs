@@ -2,7 +2,7 @@ use bodu_vm::op::{get_base, make_function, new_state, to_boolean_base};
 pub use bodu_vm as vm;
 use cbodu::op::load_lib;
 
-use std::{collections::HashMap, io::Write, sync::Arc};
+use std::{collections::HashMap, io::Write, path::{Path, PathBuf}, sync::Arc};
 
 use base64::Engine;
 
@@ -76,13 +76,15 @@ macro_rules! make_fn_true {
     };
 }
 
-pub async fn new_global_state(debug: bool) -> StateContainer {
+pub async fn new_global_state(debug: bool, path: PathBuf) -> StateContainer {
     let s = Arc::new(Mutex::new(State {
         scope: make_object(),
         parent: None,
         global: None,
         globaldata: None,
         debug,
+        pkgpath: vec![path.clone()],
+        curdir: path.clone(),
     }));
     let s2 = s.clone();
     s.lock().await.global = Some(s2);
@@ -97,6 +99,8 @@ pub async fn new_global_state(debug: bool) -> StateContainer {
         libid: 0,
         libs: HashMap::new(),
         register: HashMap::new(),
+        pkgs_release: HashMap::new(),
+        pkgs_debug: HashMap::new(),
     }));
     s.lock().await.globaldata = Some(gd);
     s
@@ -154,6 +158,7 @@ pub async fn init_global_state(state: StateContainer, args_: Vec<String>) {
     make_function!(state, scope, "hex", hex, "hex");
     make_function!(state, scope, "hex_upper", hex_upper, "hex_upper");
     make_function!(state, scope, "id", id, "id");
+    make_function_true!(state, scope, "import", import, "import");
     make_function!(state, scope, "input", input, "input");
     {
         let iter_object = make_object();
@@ -743,7 +748,7 @@ async fn from_oct(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
         return Err(make_err("from_oct requires 1 argument"));
     }
     let s = to_string_base(state.clone(), args[0].clone()).await?;
-    let n = i64::from_str_radix(&s, 8).map_err(|_| make_err("from_oct couldn't parse the binary number"))?;
+    let n = i64::from_str_radix(&s, 8).map_err(|_| make_err("from_oct couldn't parse the octal number"))?;
     Ok(make_container(Value::Number(n)))
 }
 
@@ -752,7 +757,7 @@ async fn from_hex(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<
         return Err(make_err("from_hex requires 1 argument"));
     }
     let s = to_string_base(state.clone(), args[0].clone()).await?;
-    let n = i64::from_str_radix(&s, 16).map_err(|_| make_err("from_hex couldn't parse the binary number"))?;
+    let n = i64::from_str_radix(&s, 16).map_err(|_| make_err("from_hex couldn't parse the hexadecimal number"))?;
     Ok(make_container(Value::Number(n)))
 }
 
@@ -876,4 +881,143 @@ async fn global(state: StateContainer, _: Vec<Container>, _: Gi) -> Result<Conta
         global.lock().await.scope.clone()
     };
     Ok(res)
+}
+
+#[derive(Clone, Copy)]
+enum ImportDebug {
+    Release,
+    Debug,
+    Inherit,
+}
+
+#[derive(Clone, Copy)]
+enum ImportMode {
+    Bodu,
+    Native,
+}
+
+async fn import(state: StateContainer, args: Vec<Container>, _: Gi) -> Result<Container, Container> {
+    if args.len() == 0 {
+        return Err(make_err("import requires 1 or 2 arguments"));
+    }
+    let p = to_string_base(state.clone(), args[0].clone()).await?;
+    let opts = if args.len() > 1 {
+        to_string_base(state.clone(), args[1].clone()).await?
+    } else {
+        "".to_string()
+    };
+    let mut optsv = (ImportDebug::Inherit, ImportMode::Bodu);
+    for i in opts.split(",") {
+        match i {
+            "release" => optsv.0 = ImportDebug::Release,
+            "debug" => optsv.0 = ImportDebug::Debug,
+            "bodu" => optsv.1 = ImportMode::Bodu,
+            "native" => optsv.1 = ImportMode::Native,
+            _ => {},
+        }
+    }
+    let (curdir, pkgpath, debug, global) = {
+        let state = &*state.lock().await;
+        (state.curdir.clone(), state.pkgpath.clone(), state.debug, state.global.clone().unwrap())
+    };
+    let mut pp = None;
+    let rp = if p.starts_with("./") {
+        curdir.join(p[2..].to_string())
+    } else if p.starts_with("../") {
+        curdir.join(p[3..].to_string())
+    } else {
+        let mut i = p.clone().into();
+        let p = if p.clone().contains("/") {
+            PathBuf::from(p)
+        } else {
+            PathBuf::from(p).join("main.bodu")
+        };
+        for j in pkgpath.into_iter().rev() {
+            let k = j.join("bodu_modules").join(p.clone());
+            if k.exists() {
+                pp = Some(j.join("bodu_modules").join(first_directory(&p.to_string_lossy().to_string()).unwrap()));
+                i = k;
+                break;
+            }
+        }
+        i
+    };
+    let s = new_state(global).await;
+    let mut debug = debug;
+    {
+        let s = &mut *s.lock().await;
+        match optsv.0 {
+            ImportDebug::Inherit => {},
+            ImportDebug::Release => {
+                debug = false;
+                s.debug = false;
+            },
+            ImportDebug::Debug => {
+                debug = true;
+                s.debug = true;
+            },
+        }
+        let parentp = match rp.parent() {
+            None => return Err(make_err("import received an invalid path")),
+            Some(p) => p.to_path_buf(),
+        };
+        s.curdir = parentp.clone();
+        if let Some(pp) = pp {
+            s.pkgpath.push(pp.clone());
+        }
+    }
+    {
+        let threads = &mut *state.lock().await;
+        let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
+        if debug {
+            if let Some(v) = threads.pkgs_debug.get(&rp.clone()) {
+                return Ok(v.clone());
+            }
+        } else {
+            if let Some(v) = threads.pkgs_release.get(&rp.clone()) {
+                return Ok(v.clone());
+            }
+        }
+    }
+    let f = match optsv.1 {
+        ImportMode::Bodu => {
+            let code = std::fs::read_to_string(rp.clone()).map_err(|_| make_err("import couldn't read file contents"))?;
+            let code = bodu_script::s1::s1(code).map_err(|s| make_err(&format!("parsing error inside import (S1): {}", s)))?;
+            let code = bodu_script::s2::s2(code).map_err(|s| make_err(&format!("parsing error inside import (S2): {}", s)))?;
+            let code = bodu_script::s3::s3(code).map_err(|s| make_err(&format!("parsing error inside import (S3): {}", s)))?;
+            let code = bodu_script::s4::s4(code).map_err(|s| make_err(&format!("parsing error inside import (S4): {}", s)))?;
+            make_function(s.clone(), code, Some(s.clone())).await?
+        },
+        ImportMode::Native => load_lib(s.clone(), rp.to_string_lossy().to_string()).await?,
+    };
+    let r = call(s.clone(), f, vec![]).await?;
+    {
+        let threads = &mut *state.lock().await;
+        let threads = &mut *threads.globaldata.as_mut().unwrap().lock().await;
+        if debug {
+            threads.pkgs_debug.insert(rp, r.clone());
+        } else {
+            threads.pkgs_release.insert(rp, r.clone());
+        }
+    }
+    Ok(r)
+}
+
+fn first_directory(path: &str) -> Option<PathBuf> {
+    let path = Path::new(path);
+    
+    let mut components = path.components();
+
+    for comp in &mut components {
+        if let std::path::Component::Prefix(_) | std::path::Component::RootDir = comp {
+            continue;
+        } else {
+            if let std::path::Component::Normal(os_str) = comp {
+                return Some(PathBuf::from(os_str.to_string_lossy().to_string()));
+            }
+            break;
+        }
+    }
+
+    None
 }
