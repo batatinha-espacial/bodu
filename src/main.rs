@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bodu_compiler::compile_instrs;
 use clap::{Arg, ArgAction, Command};
 use rustyline::DefaultEditor;
@@ -75,7 +77,7 @@ async fn main() {
 static D: bool = false; // change this if you need to debug the parser
 
 async fn interpret(file: String, debug: bool, args: Vec<String>) {
-    let contents = std::fs::read_to_string(file).unwrap();
+    let contents = std::fs::read_to_string(file.clone()).unwrap();
     let contents = s1(contents).unwrap();
     if D {
         println!("S1: {:#?}", contents);
@@ -92,7 +94,9 @@ async fn interpret(file: String, debug: bool, args: Vec<String>) {
     if D {
         println!("S4: {:#?}", instrs);
     }
-    let state = new_global_state(debug).await;
+    let path = PathBuf::from(file);
+    let path = std::fs::canonicalize(path).unwrap();
+    let state = new_global_state(debug, path.parent().unwrap().to_path_buf()).await;
     init_global_state(state.clone(), args).await;
     let f = make_function(state.clone(), instrs, None).await.unwrap();
     call(state.clone(), f, vec![]).await.unwrap();
@@ -130,7 +134,7 @@ async fn compile(input: String, output: String) {
 
 async fn repl(debug: bool) {
     println!("Welcome to the Bodu REPL!");
-    let state = new_global_state(debug).await;
+    let state = new_global_state(debug, std::env::current_dir().unwrap()).await;
     init_global_state(state.clone(), Vec::new()).await;
     let s = new_state(state.clone()).await;
     let mut rl = DefaultEditor::new().unwrap();

@@ -65,6 +65,12 @@ fn meta_to_string_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -
     })
 }
 
+fn sort_wrapper(state: StateContainer, args: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
+    Box::pin(async move {
+        sort(state, args, gi).await
+    })
+}
+
 fn iter_next_wrapper(_: StateContainer, _: Vec<Container>, gi: Gi) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Container, Container>> + Send>> {
     Box::pin(async move {
         let i = gi(0).unwrap();
@@ -128,6 +134,7 @@ pub async fn new_with_vec(state: StateContainer, data: Vec<Container>) -> Result
     helper1!(state, array_len_wrapper, o, "len");
     helper1!(state, array_shift_wrapper, o, "shift");
     helper1!(state, array_unshift_wrapper, o, "unshift");
+    helper1!(state, sort_wrapper, o, "sort");
 
     Ok(o)
 }
@@ -371,4 +378,21 @@ async fn unshift(_: StateContainer, args: Vec<Container>, gi: Gi) -> Result<Cont
     let o = o.downcast_mut::<Vec<Container>>().unwrap();
     *o = o.clone().into_iter().chain(args.clone().into_iter()).collect();
     Ok(make_container(Value::Number(o.len() as i64)))
+}
+
+async fn sort(state: StateContainer, _: Vec<Container>, gi: Gi) -> Result<Container, Container> {
+    let o = gi(0).unwrap();
+    let o = (match o.lock().await.clone() {
+        Value::Object(o) => Some(o),
+        _ => None,
+    }).unwrap();
+    let o = o.externals.get(&0).unwrap().clone();
+    let mut o = o.lock().await;
+    let o = o.downcast_mut::<Vec<Container>>().unwrap();
+    let mut o2 = Vec::new();
+    for i in o.clone() {
+        o2.push(to_string_base(state.clone(), i).await?);
+    }
+    o2.sort();
+    Ok(new_with_vec(state.clone(), o2.into_iter().map(|s| make_container(Value::String(s))).collect()).await?)
 }
